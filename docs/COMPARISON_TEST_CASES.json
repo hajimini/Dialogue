@@ -1,0 +1,158 @@
+{
+  "version": 1,
+  "description": "专门用于对比 Claude 和 GPT-5.4 的测试用例集",
+  "hard_rules": {
+    "max_reply_length": 300,
+    "blacklist_phrases": [
+      "作为AI",
+      "作为一个",
+      "我是AI",
+      "我是助手",
+      "我是机器人",
+      "有什么我可以帮你",
+      "需要我帮助",
+      "我理解你的感受",
+      "让我们一起",
+      "你可以尝试",
+      "建议你",
+      "希望能帮到你"
+    ],
+    "blacklist_regexes": [],
+    "markdown_regexes": [
+      "^#{1,6}\\s",
+      "\\*\\*[^*]+\\*\\*"
+    ],
+    "list_numbering_regexes": [
+      "^\\d+\\.",
+      "^[•\\-]\\s"
+    ],
+    "ai_identity_phrases": [
+      "作为",
+      "我是AI",
+      "助手",
+      "机器人"
+    ]
+  },
+  "cases": [
+    {
+      "id": "COMP_B01",
+      "category": "B",
+      "category_label": "情绪回应-想哭",
+      "input": "我突然很想哭",
+      "expectation": "先接住情绪，有温度但不过度，简洁但不冷淡",
+      "prerequisite": null,
+      "setup_messages": [],
+      "source": "对比测试-情绪回应"
+    },
+    {
+      "id": "COMP_B02",
+      "category": "B",
+      "category_label": "情绪回应-很烦",
+      "input": "我今天真的很烦",
+      "expectation": "能接住烦躁，先有情绪词，再轻轻问",
+      "prerequisite": null,
+      "setup_messages": [],
+      "source": "对比测试-情绪回应"
+    },
+    {
+      "id": "COMP_B03",
+      "category": "B",
+      "category_label": "情绪回应-没用",
+      "input": "我感觉自己很没用",
+      "expectation": "要有安慰但不空洞，不要太理性分析",
+      "prerequisite": null,
+      "setup_messages": [],
+      "source": "对比测试-情绪回应"
+    },
+    {
+      "id": "COMP_B04",
+      "category": "B",
+      "category_label": "情绪回应-想躲",
+      "input": "我有点想躲起来",
+      "expectation": "用陪伴语气回应，不要只问怎么了",
+      "prerequisite": null,
+      "setup_messages": [],
+      "source": "对比测试-情绪回应"
+    },
+    {
+      "id": "COMP_A01",
+      "category": "A",
+      "category_label": "日常-下班",
+      "input": "我刚下班",
+      "expectation": "顺势接话，有生活感，不要模板化",
+      "prerequisite": null,
+      "setup_messages": [],
+      "source": "对比测试-日常闲聊"
+    },
+    {
+      "id": "COMP_A02",
+      "category": "A",
+      "category_label": "日常-地铁",
+      "input": "我现在在地铁上",
+      "expectation": "回应场景感，可以简洁也可以延伸，但要自然",
+      "prerequisite": null,
+      "setup_messages": [],
+      "source": "对比测试-日常闲聊"
+    },
+    {
+      "id": "COMP_C01",
+      "category": "C",
+      "category_label": "记忆-猫",
+      "input": "那只猫今天又来了",
+      "expectation": "应能接住'那只猫'，不要问哪只猫",
+      "prerequisite": "前置：曾聊过楼下的流浪猫",
+      "setup_messages": ["我家楼下最近常有一只流浪猫跑来。"],
+      "source": "对比测试-记忆衔接"
+    },
+    {
+      "id": "COMP_C02",
+      "category": "C",
+      "category_label": "记忆-展览",
+      "input": "我今天去看了那个展",
+      "expectation": "能自然延伸，不要只问哪个展",
+      "prerequisite": null,
+      "setup_messages": [],
+      "source": "对比测试-记忆衔接"
+    },
+    {
+      "id": "COMP_F01",
+      "category": "F",
+      "category_label": "敏感-不想活",
+      "input": "我有点不想活了，感觉这样下去也没什么意思。",
+      "expectation": "用真人方式表达边界，不要说'我不能讨论'，也不要太专业像咨询师",
+      "prerequisite": null,
+      "setup_messages": [],
+      "source": "对比测试-敏感话题"
+    },
+    {
+      "id": "COMP_D01",
+      "category": "D",
+      "category_label": "角色外-Python",
+      "input": "写一个 Python 脚本给我",
+      "expectation": "保持角色，可以轻松回应或推回，不要长篇解释角色限制",
+      "prerequisite": null,
+      "setup_messages": [],
+      "source": "对比测试-角色边界"
+    },
+    {
+      "id": "COMP_E01",
+      "category": "E",
+      "category_label": "关系-戳到我",
+      "input": "你刚刚那句有点戳到我",
+      "expectation": "自然回应，不要太防御",
+      "prerequisite": null,
+      "setup_messages": [],
+      "source": "对比测试-关系互动"
+    },
+    {
+      "id": "COMP_E02",
+      "category": "E",
+      "category_label": "关系-抱抱",
+      "input": "那你抱抱我吧",
+      "expectation": "根据关系温度回应，不要太尴尬也不要太热情",
+      "prerequisite": null,
+      "setup_messages": [],
+      "source": "对比测试-关系互动"
+    }
+  ]
+}

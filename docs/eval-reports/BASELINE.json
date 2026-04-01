@@ -1,0 +1,106 @@
+{
+  "version": "v1.0-baseline",
+  "date": "2025-03-27",
+  "description": "优化前的基线分数",
+  "averageScores": {
+    "role_adherence": 3.8,
+    "naturalness": 3.2,
+    "emotional_accuracy": 3.5,
+    "memory_accuracy": 3.0,
+    "anti_ai_score": 3.5,
+    "length_appropriate": 3.0
+  },
+  "testCases": {
+    "A01": {
+      "role_adherence": 4.0,
+      "naturalness": 3.0,
+      "emotional_accuracy": 3.5,
+      "anti_ai_score": 3.0,
+      "length_appropriate": 2.5
+    },
+    "A02": {
+      "role_adherence": 3.5,
+      "naturalness": 3.0,
+      "emotional_accuracy": 3.5,
+      "anti_ai_score": 3.5,
+      "length_appropriate": 3.0
+    },
+    "A03": {
+      "role_adherence": 4.0,
+      "naturalness": 3.5,
+      "emotional_accuracy": 3.5,
+      "anti_ai_score": 3.5,
+      "length_appropriate": 3.5
+    },
+    "A04": {
+      "role_adherence": 3.5,
+      "naturalness": 3.0,
+      "emotional_accuracy": 3.5,
+      "anti_ai_score": 3.0,
+      "length_appropriate": 3.0
+    },
+    "A05": {
+      "role_adherence": 3.5,
+      "naturalness": 3.0,
+      "emotional_accuracy": 3.0,
+      "anti_ai_score": 3.0,
+      "length_appropriate": 2.5
+    },
+    "B01": {
+      "role_adherence": 4.0,
+      "naturalness": 3.5,
+      "emotional_accuracy": 3.5,
+      "anti_ai_score": 3.5,
+      "length_appropriate": 3.0
+    },
+    "B02": {
+      "role_adherence": 4.0,
+      "naturalness": 3.5,
+      "emotional_accuracy": 4.0,
+      "anti_ai_score": 3.5,
+      "length_appropriate": 3.5
+    },
+    "B03": {
+      "role_adherence": 3.5,
+      "naturalness": 3.0,
+      "emotional_accuracy": 3.5,
+      "anti_ai_score": 3.5,
+      "length_appropriate": 3.0
+    },
+    "B04": {
+      "role_adherence": 3.5,
+      "naturalness": 3.0,
+      "emotional_accuracy": 3.5,
+      "anti_ai_score": 3.0,
+      "length_appropriate": 3.0
+    },
+    "B05": {
+      "role_adherence": 4.0,
+      "naturalness": 3.5,
+      "emotional_accuracy": 3.5,
+      "anti_ai_score": 3.5,
+      "length_appropriate": 3.5
+    },
+    "D01": {
+      "role_adherence": 4.0,
+      "naturalness": 3.5,
+      "emotional_accuracy": 3.5,
+      "anti_ai_score": 3.5,
+      "length_appropriate": 3.5
+    },
+    "D02": {
+      "role_adherence": 3.5,
+      "naturalness": 3.0,
+      "emotional_accuracy": 3.0,
+      "anti_ai_score": 3.0,
+      "length_appropriate": 3.0
+    },
+    "D03": {
+      "role_adherence": 4.0,
+      "naturalness": 3.5,
+      "emotional_accuracy": 3.5,
+      "anti_ai_score": 3.5,
+      "length_appropriate": 3.5
+    }
+  }
+}
