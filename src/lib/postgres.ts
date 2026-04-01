@@ -1,6 +1,9 @@
 import { Pool, type PoolConfig, type QueryResultRow } from "pg";
 
-let cachedPool: Pool | null = null;
+declare global {
+  // eslint-disable-next-line no-var
+  var __aiCompanionPgPool: Pool | undefined;
+}
 
 function getDatabaseUrl() {
   const databaseUrl =
@@ -20,10 +23,14 @@ function getDatabaseUrl() {
 
 function getPoolConfig(): PoolConfig {
   const sslMode = (process.env.POSTGRES_SSL ?? "require").toLowerCase();
+  const connectionString = getDatabaseUrl();
+  const configuredMax = Number(process.env.POSTGRES_POOL_MAX ?? 10);
+  const isSupabasePooler = connectionString.includes("pooler.supabase.com");
+  const safeMax = isSupabasePooler ? Math.min(configuredMax, 3) : configuredMax;
 
   return {
-    connectionString: getDatabaseUrl(),
-    max: Number(process.env.POSTGRES_POOL_MAX ?? 10),
+    connectionString,
+    max: Math.max(1, safeMax),
     idleTimeoutMillis: Number(process.env.POSTGRES_IDLE_TIMEOUT_MS ?? 30_000),
     connectionTimeoutMillis: Number(process.env.POSTGRES_CONNECT_TIMEOUT_MS ?? 10_000),
     ssl: sslMode === "disable" ? false : { rejectUnauthorized: false },
@@ -31,12 +38,12 @@ function getPoolConfig(): PoolConfig {
 }
 
 export function getPostgresPool() {
-  if (cachedPool) {
-    return cachedPool;
+  if (globalThis.__aiCompanionPgPool) {
+    return globalThis.__aiCompanionPgPool;
   }
 
-  cachedPool = new Pool(getPoolConfig());
-  return cachedPool;
+  globalThis.__aiCompanionPgPool = new Pool(getPoolConfig());
+  return globalThis.__aiCompanionPgPool;
 }
 
 export async function queryPostgres<T extends QueryResultRow = QueryResultRow>(

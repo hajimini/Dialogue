@@ -190,8 +190,11 @@ export default function ChatWithPersona({
     setInput("");
   }
 
-  async function loadSessionMemoryContext(sessionId: string) {
-    const response = await fetch(`/api/sessions/${sessionId}/memory-context`);
+  async function loadSessionMemoryContext(sessionId: string, signal?: AbortSignal) {
+    const response = await fetch(`/api/sessions/${sessionId}/memory-context`, {
+      cache: "no-store",
+      signal,
+    });
     const json = (await response.json()) as {
       success: boolean;
       data:
@@ -617,10 +620,14 @@ export default function ChatWithPersona({
       return;
     }
 
+    const controller = new AbortController();
     let cancelled = false;
 
-    void loadSessionMemoryContext(currentSessionId)
+    void loadSessionMemoryContext(currentSessionId, controller.signal)
       .catch((error) => {
+        if (controller.signal.aborted) {
+          return;
+        }
         if (!cancelled) {
           console.warn("[ChatWithPersona] Failed to load session memory context:", error);
           setSessionMemoryContext(null);
@@ -629,6 +636,7 @@ export default function ChatWithPersona({
 
     return () => {
       cancelled = true;
+      controller.abort();
     };
   }, [currentSessionId]);
 
