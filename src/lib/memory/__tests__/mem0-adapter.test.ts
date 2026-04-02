@@ -138,7 +138,7 @@ function createListChain(records: MemoryRecord[]) {
   };
 }
 
-function createSearchChain(records: MemoryRecord[]) {
+function _createSearchChain(records: MemoryRecord[]) {
   return {
     rpc: jest.fn(async () => ({
       data: records,

@@ -46,7 +46,7 @@ Anthropic API error: 401 Unauthorized. URL: https://openrouter.vip/v1/messages, 
 === Auto Evaluator Pre-flight Checks ===
 - API Endpoint: https://openrouter.vip/v1/messages
 - Evaluator Model: claude-haiku-4-5
-- API Key: sk-GHHOYR7...y72q
+- API Key: <redacted>...<redacted>
 - Supabase URL: https://kjdjwwmindowjdmxvnui.supabase.co
 - Supabase Key: SET
 - All prerequisites satisfied
@@ -91,7 +91,7 @@ npm run test:auto-eval
 === Auto Evaluator Pre-flight Checks ===
 - API Endpoint: https://openrouter.vip/v1/messages
 - Evaluator Model: claude-haiku-4-5
-- API Key: sk-GHHOYR7...y72q
+- API Key: <redacted>...<redacted>
 - Supabase URL: https://kjdjwwmindowjdmxvnui.supabase.co
 - Supabase Key: SET
 - All prerequisites satisfied

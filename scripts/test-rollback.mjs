@@ -13,7 +13,7 @@
  *   node scripts/test-rollback.mjs
  */
 
-import { readFile, writeFile, readdir } from 'node:fs/promises';
+import { readFile, readdir } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -39,7 +39,7 @@ try {
     console.log(`  ✓ Found ${backupFiles.length} backup file(s)`);
     console.log(`  ✓ Latest: ${backupFiles[0]}`);
   }
-} catch (error) {
+} catch {
   console.error('  ✗ Failed:', error.message);
 }
 
@@ -79,7 +79,7 @@ try {
   } else {
     console.log('  ⚠️  No backup files to verify');
   }
-} catch (error) {
+} catch {
   console.error('  ✗ Failed:', error.message);
 }
 
@@ -89,7 +89,7 @@ try {
   const rollbackScriptPath = path.join(projectRoot, 'scripts', 'rollback-migration.ts');
   await readFile(rollbackScriptPath, 'utf8');
   console.log('  ✓ rollback-migration.ts exists');
-} catch (error) {
+} catch {
   console.error('  ✗ rollback-migration.ts not found');
 }
 

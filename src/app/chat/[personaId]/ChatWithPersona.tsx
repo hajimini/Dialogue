@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -140,9 +140,11 @@ export default function ChatWithPersona({
   const [sessionMemoryContext, setSessionMemoryContext] = useState<SessionMemoryContext | null>(
     null,
   );
+  const [memoryGenerationStatus, setMemoryGenerationStatus] = useState<string | null>(null);
 
   const listEndRef = useRef<HTMLDivElement | null>(null);
   const pathname = usePathname();
+  const memoryStatusCheckRef = useRef<NodeJS.Timeout | null>(null);
 
   const userMessageCount = useMemo(
     () => messages.filter((message) => message.role === "user").length,
@@ -150,8 +152,8 @@ export default function ChatWithPersona({
   );
 
   const canSend = useMemo(
-    () => input.trim().length > 0 && !isLoading && !isSwitchingSession,
-    [input, isLoading, isSwitchingSession],
+    () => input.trim().length > 0 && !isSwitchingSession,
+    [input, isSwitchingSession],
   );
   const latestMemoryContext = useMemo(() => {
     const reversed = [...messages].reverse();
@@ -207,13 +209,53 @@ export default function ChatWithPersona({
     };
 
     if (!json.success || !json.data) {
-      throw new Error(json.error?.message || "璇诲彇璁板繂涓婁笅鏂囧け璐?");
+      throw new Error(json.error?.message || "读取记忆上下文失败");
     }
 
     setSessionMemoryContext({
       memories: json.data.memories,
       userProfile: json.data.user_profile,
     });
+
+    // 如果记忆为空，检查是否正在生成
+    if (json.data.memories.length === 0) {
+      checkMemoryGenerationStatus(sessionId);
+    }
+  }
+
+  async function checkMemoryGenerationStatus(sessionId: string) {
+    try {
+      const response = await fetch(`/api/sessions/${sessionId}/memory-status`);
+      const json = (await response.json()) as {
+        success: boolean;
+        data: {
+          memoryCount: number;
+          isComplete: boolean;
+          estimatedTimeRemaining: number;
+        } | null;
+      };
+
+      if (json.success && json.data) {
+        if (!json.data.isComplete) {
+          setMemoryGenerationStatus("记忆正在生成中，请稍候...");
+
+          // 轮询检查状态
+          if (memoryStatusCheckRef.current) {
+            clearTimeout(memoryStatusCheckRef.current);
+          }
+
+          memoryStatusCheckRef.current = setTimeout(() => {
+            void loadSessionMemoryContext(sessionId);
+          }, 3000); // 3秒后重新检查
+        } else if (json.data.memoryCount === 0) {
+          setMemoryGenerationStatus("该会话暂无记忆");
+        } else {
+          setMemoryGenerationStatus(null);
+        }
+      }
+    } catch (error) {
+      console.error("检查记忆生成状态失败:", error);
+    }
   }
 
   async function handleSelectSession(sessionId: string) {
@@ -272,7 +314,16 @@ export default function ChatWithPersona({
 
         const json = (await response.json()) as {
           success: boolean;
-          data: { session_id: string; message_count: number } | null;
+          data: {
+            session_id: string;
+            message_count: number;
+            stats?: {
+              totalImported: number;
+              memoryGenerated: boolean;
+              profileUpdated: boolean;
+            };
+            note?: string;
+          } | null;
           error: { message: string } | null;
         };
 
@@ -280,9 +331,17 @@ export default function ChatWithPersona({
           throw new Error(json.error?.message || "导入对话失败");
         }
 
+        // 显示导入结果
+        if (json.data.note) {
+          console.log(`[Import] ${json.data.note}`);
+        }
+
         // Load the imported session
         await loadSessionMessages(json.data.session_id);
         await refreshSessionList();
+
+        // 显示成功提示
+        setErrorText(null);
       } else {
         // Normal session creation
         const response = await fetch(`/api/personas/${persona.id}/sessions`, {
@@ -411,13 +470,23 @@ export default function ChatWithPersona({
     }
   }
 
+  const handleInputChange = useCallback((event: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setInput(event.target.value);
+  }, []);
+
+  const handleKeyDown = useCallback((event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault();
+      void handleSend();
+    }
+  }, [handleSend]);
+
   async function handleSend() {
     const text = input.trim();
-    if (!text || !currentSessionId || isLoading || isSwitchingSession) return;
+    if (!text || !currentSessionId || isSwitchingSession) return;
 
     setErrorText(null);
     setPendingDownvoteFor(null);
-    setIsLoading(true);
 
     const optimisticUserMessage: ChatMessage = {
       id: newId(),
@@ -429,6 +498,7 @@ export default function ChatWithPersona({
 
     setMessages((current) => [...current, optimisticUserMessage]);
     setInput("");
+    setIsLoading(true);
 
     try {
       const response = await fetch("/api/chat", {
@@ -617,6 +687,14 @@ export default function ChatWithPersona({
   useEffect(() => {
     if (!currentSessionId) {
       setSessionMemoryContext(null);
+      setMemoryGenerationStatus(null);
+
+      // 清理定时器
+      if (memoryStatusCheckRef.current) {
+        clearTimeout(memoryStatusCheckRef.current);
+        memoryStatusCheckRef.current = null;
+      }
+
       return;
     }
 
@@ -637,6 +715,12 @@ export default function ChatWithPersona({
     return () => {
       cancelled = true;
       controller.abort();
+
+      // 清理定时器
+      if (memoryStatusCheckRef.current) {
+        clearTimeout(memoryStatusCheckRef.current);
+        memoryStatusCheckRef.current = null;
+      }
     };
   }, [currentSessionId]);
 
@@ -754,10 +838,11 @@ export default function ChatWithPersona({
             </form>
           </div>
 
-          <div className="px-4 pb-2 text-sm font-medium text-white/90">历史会话</div>
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+            <div className="px-4 pb-2 pt-0 text-sm font-medium text-white/90">历史会话</div>
 
-          <div className="space-y-2 px-3 pb-4">
-            {sessions.slice(0, showAllSessions ? sessions.length : 8).map((session, index) => {
+            <div className="shrink-0 space-y-2 overflow-y-auto px-3 pb-4" style={{ maxHeight: '35%' }}>
+              {sessions.slice(0, showAllSessions ? sessions.length : 8).map((session, index) => {
               const active = session.id === currentSessionId;
 
               return (
@@ -818,7 +903,7 @@ export default function ChatWithPersona({
 
           <div className="px-4 pb-2 text-sm font-medium text-white/90">人设列表</div>
 
-          <div className="flex-1 space-y-2 overflow-y-auto px-3 pb-4">
+          <div className="min-h-0 flex-1 space-y-2 overflow-y-auto px-3 pb-4">
             {personas.map((item, index) => {
               const active = item.id === persona.id;
 
@@ -864,6 +949,7 @@ export default function ChatWithPersona({
               );
             })}
           </div>
+        </div>
         </aside>
 
         <section className="relative flex flex-1 flex-col overflow-hidden rounded-[30px] border border-[#d7ebe2] bg-white/75 shadow-[0_25px_60px_rgba(36,79,64,0.12)] backdrop-blur">
@@ -1022,6 +1108,7 @@ export default function ChatWithPersona({
                 isLoading={isLoading}
                 onFeedback={(memoryId) => submitMemoryFeedback(memoryId)}
                 pendingMemoryId={submittingMemoryFeedbackId}
+                generationStatus={memoryGenerationStatus}
               />
             </div>
             <form
@@ -1038,15 +1125,10 @@ export default function ChatWithPersona({
                 <textarea
                   id="chat-input"
                   value={input}
-                  onChange={(event) => setInput(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter" && !event.shiftKey) {
-                      event.preventDefault();
-                      void handleSend();
-                    }
-                  }}
+                  onChange={handleInputChange}
+                  onKeyDown={handleKeyDown}
                   rows={1}
-                  disabled={!currentSessionId || isLoading || isSwitchingSession}
+                  disabled={!currentSessionId || isSwitchingSession}
                   className="min-h-12 w-full resize-none rounded-[20px] border border-[#d9efe6] bg-white px-4 py-3 text-sm text-[#0b141a] outline-none placeholder:text-[#7b8f87] focus:ring-2 focus:ring-[#1fa66f]"
                   placeholder="输入消息，Enter 发送，Shift + Enter 换行"
                 />

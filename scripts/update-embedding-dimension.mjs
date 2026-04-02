@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { createClient } from '@supabase/supabase-js';
-import { readFileSync } from 'fs';
+
 import dotenv from 'dotenv';
 
 dotenv.config({ path: '.env.local' });

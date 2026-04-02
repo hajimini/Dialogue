@@ -22,6 +22,12 @@ export async function GET(
     }
 
     const { sessionId } = await context.params;
+
+    console.log('[MemoryContext] 开始获取记忆上下文:', {
+      sessionId,
+      userId: user.id,
+    });
+
     const session = await queryPostgres<{
       id: string;
       persona_id: string;
@@ -39,13 +45,22 @@ export async function GET(
 
     const currentSession = session.rows[0] ?? null;
     if (!currentSession) {
+      console.log('[MemoryContext] 会话未找到');
       return NextResponse.json(
         { success: false, data: null, error: { message: "Session not found." } },
         { status: 404 },
       );
     }
 
+    console.log('[MemoryContext] 会话信息:', {
+      sessionId: currentSession.id,
+      personaId: currentSession.persona_id,
+      characterId: currentSession.character_id,
+      userId: currentSession.user_id,
+    });
+
     if (!currentSession.character_id) {
+      console.log('[MemoryContext] 会话没有character_id，返回空记忆');
       return NextResponse.json({
         success: true,
         data: {
@@ -60,6 +75,8 @@ export async function GET(
       userId: user.id,
     });
 
+    console.log('[MemoryContext] 确保会话后的character_id:', ensuredSession.character_id);
+
     const personaResult = await queryPostgres<Persona>(
       `
         select *
@@ -72,6 +89,7 @@ export async function GET(
     const persona = personaResult.rows[0] ?? null;
 
     if (!persona) {
+      console.log('[MemoryContext] 人设未找到');
       return NextResponse.json(
         { success: false, data: null, error: { message: "Persona not found." } },
         { status: 404 },
@@ -84,6 +102,9 @@ export async function GET(
     const latestUserMessage =
       [...recentMessages].reverse().find((message) => message.role === "user")?.content?.trim() || "";
 
+    console.log('[MemoryContext] 最近用户消息:', latestUserMessage.substring(0, 50));
+    console.log('[MemoryContext] 开始获取记忆上下文...');
+
     const memoryContext = await getMemoryContext({
       userId: user.id,
       personaId: currentSession.persona_id,
@@ -94,6 +115,19 @@ export async function GET(
       sessionId: currentSession.id,
       messageCount: recentMessages.length,
     });
+
+    console.log('[MemoryContext] 记忆上下文获取完成:', {
+      relevantMemoriesCount: memoryContext.relevantMemories.length,
+      hasUserProfile: Boolean(memoryContext.userProfile),
+      recentSummariesCount: memoryContext.recentSummaries.length,
+    });
+
+    if (memoryContext.relevantMemories.length > 0) {
+      console.log('[MemoryContext] 记忆列表:');
+      memoryContext.relevantMemories.slice(0, 3).forEach((mem, idx) => {
+        console.log(`  ${idx + 1}. [${mem.memory_type}] ${mem.content.substring(0, 40)}...`);
+      });
+    }
 
     return NextResponse.json({
       success: true,
@@ -112,6 +146,7 @@ export async function GET(
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to load session memory context.";
+    console.error('[MemoryContext] 错误:', error);
     return NextResponse.json(
       { success: false, data: null, error: { message } },
       { status: 500 },

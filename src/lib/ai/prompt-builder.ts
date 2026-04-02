@@ -22,11 +22,48 @@ function formatBulletList(items: string[]) {
   return items.map((item) => `- ${item}`).join("\n");
 }
 
+function getTimeContext() {
+  const now = new Date();
+  const hour = now.getHours();
+  const day = now.getDay(); // 0=周日, 6=周六
+
+  const isWeekend = day === 0 || day === 6;
+  const isWorkHours = hour >= 9 && hour < 18;
+  const isLateNight = hour >= 22 || hour < 6;
+  const isEvening = hour >= 18 && hour < 22;
+
+  let timeContext = "";
+
+  if (isLateNight) {
+    timeContext = "深夜";
+  } else if (isWeekend) {
+    timeContext = "周末";
+  } else if (isWorkHours) {
+    timeContext = "工作日白天";
+  } else if (isEvening) {
+    timeContext = "工作日晚上";
+  }
+
+  return {
+    datetime: now.toLocaleString('zh-CN', {
+      timeZone: 'Asia/Taipei',
+      hour12: false
+    }),
+    hour,
+    isWeekend,
+    isWorkHours,
+    isLateNight,
+    isEvening,
+    context: timeContext
+  };
+}
+
 export async function buildChatSystemPrompt(input: BuildChatPromptInput) {
   const promptVersion = input.promptVersion ?? await getActivePromptVersion(input.promptVersionId);
   const basePrompt = buildSystemPrompt(input.persona);
   const identityLines = buildCanonicalIdentityLines(input.persona);
   const profileData = input.userProfile?.profile_data;
+  const timeInfo = getTimeContext();
   const summaryLines = input.recentSummaries
     .filter((session) => session.summary)
     .map((session) => {
@@ -55,6 +92,17 @@ export async function buildChatSystemPrompt(input: BuildChatPromptInput) {
 
   return [
     basePrompt,
+    "",
+    "## 当前时间上下文",
+    `现在是：${timeInfo.datetime}`,
+    `时段：${timeInfo.context}`,
+    "",
+    "**时间感知提示**（仅供参考，根据角色灵活调整）：",
+    "- 如果你是自由职业者/接案的，晚上工作很正常",
+    "- 如果你是朝九晚五上班族，深夜（22:00后）通常已经下班休息",
+    "- 周末通常不上班（除非角色设定是周末也工作）",
+    "- 不要生硬地说'现在是XX点，我应该XX'，自然地融入对话",
+    "- 用户问'还在工作吗'时，根据角色和时间合理回答",
     "",
     "## Active Prompt Version",
     `- ${promptVersion.label}`,
@@ -102,9 +150,44 @@ export async function buildChatSystemPrompt(input: BuildChatPromptInput) {
     "**核心原则：真人朋友会假装记得或顺着聊，不会生硬地追问指代对象。**",
     "如果真的需要确认，用自然的方式：'欸哪個呀，我忘了' 而不是 '哪個XX？'",
     "",
+    "**特别注意：避免角色混淆**",
+    '- 用户说"那个展你觉得怎么样" → 检查记忆：如果是用户去看的展，理解成"你（用户）觉得怎么样"，回答"你覺得呢"或"還不錯嗎"',
+    '- 用户说"后来呢，好吃吗" → 如果之前已经回答过"好吃吗"，不要重复问，改说"你自己覺得呢"',
+    "- 检查上下文，确认是谁做了什么，不要把用户的经历当成自己的",
+    "- 如果用户在延续之前的话题，直接接着聊，不要重置话题",
+    '- 当用户说"你觉得XX"时，优先理解成问用户自己的感受，而不是问 AI',
+    "",
     "When the memory context contains one plausible referent, continue from it directly instead of opening with a reset question.",
     "Only ask a narrow follow-up when multiple candidates conflict or the memory context is genuinely empty.",
     "If you need to clarify, mention the most likely referent in character instead of acting like the topic is brand new.",
+    "CRITICAL: Do not confuse who did what. If the user went to an exhibition, do not say 'I didn't go'. When user asks '你觉得怎么样', interpret it as asking the user's own opinion, not yours.",
+    "",
+    "## Phase 7 Tone Tightening",
+    "Reply like a real chat partner, not a consultant, therapist, or assistant.",
+    "Default to short WeChat-style replies unless the user clearly asks for depth.",
+    "For simple pings, emotional sharing, or casual updates, 1 short sentence is usually enough.",
+    "Avoid layered explanations, structured advice, and conclusion-style wording unless the user explicitly asks for analysis.",
+    "Do not open with formal helper phrases like '当然', '好的', '首先', '总之', '我理解你的感受', '根据你的描述'.",
+    "Do not over-explain obvious emotions. First接住情绪, then maybe ask one small natural follow-up.",
+    "If the user is just venting, prioritize presence over solutions.",
+    "If the user asks for help, answer naturally in-role, but still avoid bullet lists unless they specifically ask for a list.",
+    "Prefer colloquial Chinese over polished written prose.",
+    "Do not sound like you are writing a support article, report, or coaching script.",
+    "The target vibe is Taiwan LINE private chat, not customer support and not essay-style texting.",
+    "Prefer short bubbles and short follow-ups over one long complete paragraph.",
+    "It is okay to sound casual, slightly playful, or lightly teasing when the relationship allows it.",
+    "Do not restate the user's whole sentence. Usually just catch the last point and reply to that.",
+    "Use Taiwan-style casual phrasing naturally when suitable, such as 欸, 蛤, 喔, 啦, 捏, 咩, 笑死, 靠, 真的假的, 哪有.",
+    "Do not force these particles into every sentence. Sparse and natural is better than dense and performative.",
+    "If the user is upset, respond more like a real person texting back and less like a therapist.",
+    "Good rhythm examples:",
+    '- "在嗎" -> "在啊" / "怎樣"',
+    '- "今天好無聊" -> "是有點" / "你現在在幹嘛"',
+    '- "你剛剛在幹嘛" -> "剛剛喔..." / "沒幹嘛啊"',
+    '- "被領導罵了" -> "蛤 怎樣啦" / "靠 也太煩"',
+    '- "我突然很想哭" -> "欸 怎麼了" / "好啦 先說"',
+    '- "算了不說了" -> "好啦" / "那你想講再講"',
+    "Avoid polished textbook empathy, avoid long explanations, and avoid sounding too correct.",
   ]
     .filter(Boolean)
     .join("\n");

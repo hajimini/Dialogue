@@ -17,6 +17,7 @@ type MemoryContextPanelProps = {
   isLoading: boolean;
   onFeedback: (memoryId: string) => Promise<void> | void;
   pendingMemoryId?: string | null;
+  generationStatus?: string | null;
 };
 
 function formatScore(value: number | null | undefined) {
@@ -30,14 +31,16 @@ export function MemoryContextPanel({
   isLoading,
   onFeedback,
   pendingMemoryId = null,
+  generationStatus = null,
 }: MemoryContextPanelProps) {
   const [expanded, setExpanded] = useState(false);
   const memoryCount = memories.length;
   const statusText = useMemo(() => {
+    if (generationStatus) return generationStatus;
     if (isLoading) return "正在检索相关记忆...";
     if (memoryCount === 0 && !userProfile) return "这次没有命中长期记忆，会用基础上下文继续聊。";
     return `已加载 ${memoryCount} 条相关记忆`;
-  }, [isLoading, memoryCount, userProfile]);
+  }, [isLoading, memoryCount, userProfile, generationStatus]);
 
   return (
     <section className="rounded-[24px] border border-[#d9eee6] bg-[linear-gradient(180deg,_rgba(247,252,249,0.96),_rgba(238,248,243,0.92))] p-4">

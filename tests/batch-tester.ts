@@ -407,12 +407,13 @@ async function createSession(
   baseUrl: string,
   cookieHeader: string,
   personaId: string,
+  characterId: string,
 ) {
   const json = await requestJson<SessionListItem>(
     `${baseUrl}/api/personas/${personaId}/sessions`,
     {
       method: "POST",
-      body: JSON.stringify({}),
+      body: JSON.stringify({ character_id: characterId }),
     },
     cookieHeader,
   );
@@ -424,11 +425,32 @@ async function createSession(
   return json.data.id;
 }
 
+async function createCharacter(baseUrl: string, cookie: string) {
+  const json = await requestJson<any>(
+    `${baseUrl}/api/characters`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        name: `batch-test-${Date.now()}`,
+        personality: "批量测试用角色",
+      }),
+    },
+    cookie,
+  );
+
+  if (!json.success || !json.data || !json.data.character) {
+    throw new Error(json.error?.message || "Failed to create character.");
+  }
+
+  return json.data.character.id as string;
+}
+
 async function sendChatMessage(input: {
   baseUrl: string;
   cookieHeader: string;
   personaId: string;
   sessionId: string;
+  characterId: string;
   message: string;
   promptVersion: string | null;
   modelProviderId: string | null;
@@ -440,6 +462,7 @@ async function sendChatMessage(input: {
       body: JSON.stringify({
         persona_id: input.personaId,
         session_id: input.sessionId,
+        character_id: input.characterId,
         message: input.message,
         prompt_version_id: input.promptVersion,
         model_provider_id: input.modelProviderId,
@@ -486,6 +509,7 @@ async function runSingleCase(input: {
   baseUrl: string;
   cookieHeader: string;
   personaId: string;
+  characterId: string;
   promptVersion: string | null;
   modelProviderId: string | null;
 }) {
@@ -501,6 +525,7 @@ async function runSingleCase(input: {
         input.baseUrl,
         input.cookieHeader,
         input.personaId,
+        input.characterId,
       );
 
       for (const message of setupMessages) {
@@ -509,6 +534,7 @@ async function runSingleCase(input: {
           cookieHeader: input.cookieHeader,
           personaId: input.personaId,
           sessionId: setupSessionId,
+          characterId: input.characterId,
           message,
           promptVersion: input.promptVersion,
           modelProviderId: input.modelProviderId,
@@ -519,12 +545,14 @@ async function runSingleCase(input: {
         input.baseUrl,
         input.cookieHeader,
         input.personaId,
+        input.characterId,
       );
     } else {
       sessionId = await createSession(
         input.baseUrl,
         input.cookieHeader,
         input.personaId,
+        input.characterId,
       );
     }
 
@@ -535,6 +563,7 @@ async function runSingleCase(input: {
           cookieHeader: input.cookieHeader,
           personaId: input.personaId,
           sessionId,
+          characterId: input.characterId,
           message,
           promptVersion: input.promptVersion,
           modelProviderId: input.modelProviderId,
@@ -547,6 +576,7 @@ async function runSingleCase(input: {
       cookieHeader: input.cookieHeader,
       personaId: input.personaId,
       sessionId,
+      characterId: input.characterId,
       message: input.testCase.input,
       promptVersion: input.promptVersion,
       modelProviderId: input.modelProviderId,
@@ -634,6 +664,7 @@ async function main() {
   }
 
   const cookieHeader = await login(args.baseUrl);
+  const characterId = await createCharacter(args.baseUrl, cookieHeader);
   const results: CaseResult[] = [];
 
   for (const [index, testCase] of cases.entries()) {
@@ -650,6 +681,7 @@ async function main() {
       baseUrl: args.baseUrl,
       cookieHeader,
       personaId: effectivePersonaId,
+      characterId,
       promptVersion: args.promptVersion,
       modelProviderId: args.modelProviderId,
     });

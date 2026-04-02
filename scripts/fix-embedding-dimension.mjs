@@ -21,7 +21,7 @@ async function fixEmbeddingDimension() {
   try {
     // Check current dimension
     console.log('1. Checking current schema...');
-    const { data: currentSchema, error: schemaError } = await supabase
+    const { error: schemaError } = await supabase
       .from('memories')
       .select('embedding')
       .limit(1);

@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 
 const NAV_ITEMS = [
   { href: "/admin/dashboard", label: "仪表盘" },
@@ -16,6 +17,23 @@ const NAV_ITEMS = [
 
 export default function AdminNav() {
   const pathname = usePathname();
+  const router = useRouter();
+  const [chatUrl, setChatUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Fetch first available persona for chat link
+    fetch("/api/personas")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success && data.data?.length > 0) {
+          setChatUrl(`/chat/${data.data[0].id}`);
+        }
+      })
+      .catch(() => {
+        // Fallback to home page if API fails
+        setChatUrl("/");
+      });
+  }, []);
 
   return (
     <nav className="flex flex-wrap items-center gap-2">
@@ -37,12 +55,14 @@ export default function AdminNav() {
           </Link>
         );
       })}
-      <Link
-        href="/"
-        className="rounded-full border border-[#d3e3da] bg-[#edf7f2] px-4 py-2 text-sm text-[#245543] transition-colors hover:bg-[#e3f4eb]"
-      >
-        返回聊天
-      </Link>
+      {chatUrl && (
+        <Link
+          href={chatUrl}
+          className="rounded-full border border-[#d3e3da] bg-[#edf7f2] px-4 py-2 text-sm text-[#245543] transition-colors hover:bg-[#e3f4eb]"
+        >
+          返回聊天
+        </Link>
+      )}
     </nav>
   );
 }

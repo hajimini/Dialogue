@@ -30,7 +30,7 @@ async function testMetricsIntegration() {
         importance: 0.8,
       });
       console.log('✓ Memory added successfully');
-    } catch (error) {
+    } catch {
       console.log('Note: Add operation failed (expected if no Supabase), but metric should still be recorded');
     }
 
@@ -57,7 +57,7 @@ async function testMetricsIntegration() {
         limit: 5,
       });
       console.log('✓ Memory search completed');
-    } catch (error) {
+    } catch {
       console.log('Note: Search operation failed (expected if no Supabase), but metric should still be recorded');
     }
 
@@ -100,7 +100,7 @@ async function testMetricsIntegration() {
     }
 
     console.log('\n✓ Integration test completed successfully!');
-  } catch (error) {
+  } catch {
     console.error('✗ Integration test failed:', error);
     process.exit(1);
   }

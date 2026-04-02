@@ -175,7 +175,7 @@ async function runTests() {
     new EmbeddingService(config14);
     testsPassed++;
     console.log('✓ Should accept openai provider');
-  } catch (error) {
+  } catch {
     testsFailed++;
     console.error('✗ Should accept openai provider');
   }
@@ -191,7 +191,7 @@ async function runTests() {
     new EmbeddingService(config15);
     testsPassed++;
     console.log('✓ Should accept bge-m3 provider');
-  } catch (error) {
+  } catch {
     testsFailed++;
     console.error('✗ Should accept bge-m3 provider');
   }

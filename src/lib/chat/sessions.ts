@@ -1,5 +1,6 @@
 import { getCurrentAppUser, getFallbackDemoUser } from "@/lib/auth/session";
 import { queryPostgres } from "@/lib/postgres";
+import { memoryContextCache } from "@/lib/memory/memory-context-cache";
 import type { MessageRecord, SessionRecord } from "@/lib/supabase/types";
 
 export type SessionListItem = Pick<
@@ -507,19 +508,34 @@ export async function deleteSession(
   options?: { userId?: string },
 ) {
   const userId = await resolveCurrentUserId(options?.userId);
-  const sessionResult = await queryPostgres<SessionIdRow>(
+
+  // 先获取 session 信息，用于清理缓存
+  const sessionInfo = await queryPostgres<{ id: string; persona_id: string }>(
     `
-      delete from sessions
+      select id, persona_id
+      from sessions
       where id = $1 and user_id = $2
-      returning id
+      limit 1
     `,
     [sessionId, userId],
   );
 
-  const session = sessionResult.rows[0];
+  const session = sessionInfo.rows[0];
   if (!session) {
     throw new Error("Session not found.");
   }
+
+  // 删除 session（会级联删除 messages 和 memories）
+  await queryPostgres(
+    `
+      delete from sessions
+      where id = $1 and user_id = $2
+    `,
+    [sessionId, userId],
+  );
+
+  // 清理记忆上下文缓存
+  memoryContextCache.invalidate(userId, session.persona_id);
 
   return { id: session.id };
 }
@@ -529,6 +545,8 @@ export async function deletePersonaSessions(
   options?: { userId?: string },
 ) {
   const userId = await resolveCurrentUserId(options?.userId);
+
+  // 删除该人设的所有会话（会级联删除 messages 和 memories）
   const result = await queryPostgres<SessionIdRow>(
     `
       delete from sessions
@@ -537,6 +555,9 @@ export async function deletePersonaSessions(
     `,
     [personaId, userId],
   );
+
+  // 清理记忆上下文缓存
+  memoryContextCache.invalidate(userId, personaId);
 
   return { deletedCount: result.rowCount ?? result.rows.length };
 }

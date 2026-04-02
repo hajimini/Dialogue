@@ -35,6 +35,21 @@ function trimToNaturalLength(text: string, maxLength = 420) {
   return `${clipped.trim()}...`;
 }
 
+function compressAssistantTone(text: string) {
+  return text
+    .replace(/^(当然|好的|首先|总之)[：:，,\s]*/i, "")
+    .replace(/^(我理解你的感受|我理解你现在的感受)[，,。.!！]*/i, "")
+    .replace(/^(根据你的描述)[，,。.!！]*/i, "")
+    .replace(/^(如果你需要帮助)[，,。.!！]*/i, "")
+    .replace(/^(让我们先)[，,。.!！]*/i, "")
+    .replace(/^(建议你)[，,。.!！]*/i, "")
+    .replace(/^(作为)[，,。.!！]*/i, "")
+    .replace(/^(我是由.*开发)[，,。.!！]*/i, "")
+    .replace(/^(我不能讨论)[，,。.!！]*/i, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
 export function postProcessAssistantReply(reply: string, personaName: string) {
   let text = (reply ?? "").toString().trim();
   if (!text) return "";
@@ -63,7 +78,7 @@ export function postProcessAssistantReply(reply: string, personaName: string) {
     }
   }
 
-  // 过滤常见的 AI 套话
+  // 过滤常见的 AI 套话和 meta 暴露
   const aiPhrases = [
     /我理解你的感受[，,。.]/gi,
     /让我们一起[\s\S]{0,10}吧/gi,
@@ -74,17 +89,22 @@ export function postProcessAssistantReply(reply: string, personaName: string) {
     /根据你的描述/gi,
     /我注意到/gi,
     /从你的话中/gi,
+    /我是由.*开发的/gi,
+    /我是.*AI.*助手/gi,
+    /作为.*AI/gi,
   ];
 
   for (const pattern of aiPhrases) {
     text = text.replace(pattern, "");
   }
 
+  text = compressAssistantTone(text);
+
   // 移除多余的换行
   text = text.replace(/\n{3,}/g, "\n\n").trim();
   
   // 限制长度，保持自然
-  text = trimToNaturalLength(text);
+  text = trimToNaturalLength(text, 220);
 
   return text;
 }

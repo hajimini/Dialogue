@@ -6,15 +6,14 @@
  * 同时测试人设和角色组合的记忆隔离
  */
 
-import { randomUUID } from 'crypto';
 
 // 配置
-const BASE_URL = process.env.BASE_URL || 'http://localhost:3000';
-const TEST_USER_EMAIL = process.env.TEST_USER_EMAIL || 'admin@ai-companion.local';
-const TEST_USER_PASSWORD = process.env.TEST_USER_PASSWORD || 'admin123456';
+const PERSONA_TEST_BASE_URL = process.env.BASE_URL || 'http://localhost:3000';
+const PERSONA_TEST_USER_EMAIL = process.env.TEST_USER_EMAIL || 'admin@ai-companion.local';
+const PERSONA_TEST_USER_PASSWORD = process.env.TEST_USER_PASSWORD || 'admin123456';
 
 // 测试数据
-const TEST_SCENARIOS = {
+const PERSONA_TEST_SCENARIOS = {
   scenario2: {
     name: '场景2：同用户 + 不同人设 + 同角色',
     characterName: '直连A-082698',
@@ -57,7 +56,7 @@ const TEST_SCENARIOS = {
 };
 
 // 类型定义
-type TestResult = {
+type PersonaTestResult = {
   scenario: string;
   test: string;
   passed: boolean;
@@ -66,18 +65,18 @@ type TestResult = {
 };
 
 // 测试结果收集
-const results: TestResult[] = [];
+const personaTestResults: PersonaTestResult[] = [];
 
 // 辅助函数：登录并获取 cookie
-async function login(): Promise<string> {
+async function personaTestLogin(): Promise<string> {
   console.log('🔐 登录测试账户...');
 
-  const response = await fetch(`${BASE_URL}/api/auth/login`, {
+  const response = await fetch(`${PERSONA_TEST_BASE_URL}/api/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      email: TEST_USER_EMAIL,
-      password: TEST_USER_PASSWORD
+      email: PERSONA_TEST_USER_EMAIL,
+      password: PERSONA_TEST_USER_PASSWORD
     })
   });
 
@@ -95,8 +94,8 @@ async function login(): Promise<string> {
 }
 
 // 辅助函数：获取人设列表
-async function getPersonas(cookie: string): Promise<Array<{ id: string; name: string }>> {
-  const response = await fetch(`${BASE_URL}/api/personas`, {
+async function personaTestGetPersonas(cookie: string): Promise<Array<{ id: string; name: string }>> {
+  const response = await fetch(`${PERSONA_TEST_BASE_URL}/api/personas`, {
     headers: { Cookie: cookie }
   });
 
@@ -117,8 +116,8 @@ async function getPersonas(cookie: string): Promise<Array<{ id: string; name: st
 }
 
 // 辅助函数：获取角色列表
-async function getCharacters(cookie: string): Promise<Array<{ id: string; name: string }>> {
-  const response = await fetch(`${BASE_URL}/api/characters`, {
+async function personaTestGetCharacters(cookie: string): Promise<Array<{ id: string; name: string }>> {
+  const response = await fetch(`${PERSONA_TEST_BASE_URL}/api/characters`, {
     headers: { Cookie: cookie }
   });
 
@@ -141,12 +140,12 @@ async function getCharacters(cookie: string): Promise<Array<{ id: string; name: 
 }
 
 // 辅助函数：创建新会话
-async function createSession(
+async function personaTestCreateSession(
   cookie: string,
   personaId: string,
   characterId: string
 ): Promise<string> {
-  const response = await fetch(`${BASE_URL}/api/personas/${personaId}/sessions`, {
+  const response = await fetch(`${PERSONA_TEST_BASE_URL}/api/personas/${personaId}/sessions`, {
     method: 'POST',
     headers: {
       Cookie: cookie,
@@ -166,13 +165,13 @@ async function createSession(
 }
 
 // 辅助函数：发送消息
-async function sendMessage(
+async function personaTestSendMessage(
   cookie: string,
   personaId: string,
   sessionId: string,
   message: string
 ): Promise<string> {
-  const response = await fetch(`${BASE_URL}/api/chat`, {
+  const response = await fetch(`${PERSONA_TEST_BASE_URL}/api/chat`, {
     method: 'POST',
     headers: {
       Cookie: cookie,
@@ -194,7 +193,7 @@ async function sendMessage(
 }
 
 // 辅助函数：查询记忆
-async function getMemories(
+async function personaTestGetMemories(
   cookie: string,
   personaId: string,
   characterId?: string
@@ -204,7 +203,7 @@ async function getMemories(
     params.append('character_id', characterId);
   }
 
-  const response = await fetch(`${BASE_URL}/api/memories?${params}`, {
+  const response = await fetch(`${PERSONA_TEST_BASE_URL}/api/memories?${params}`, {
     headers: { Cookie: cookie }
   });
 
@@ -217,20 +216,20 @@ async function getMemories(
 }
 
 // 辅助函数：等待记忆存储
-async function waitForMemoryStorage(ms: number = 3000): Promise<void> {
+async function personaTestWaitForMemoryStorage(ms: number = 3000): Promise<void> {
   console.log(`⏳ 等待 ${ms}ms 让记忆系统处理...`);
   await new Promise(resolve => setTimeout(resolve, ms));
 }
 
 // 测试场景 2：同用户 + 不同人设 + 同角色
-async function testScenario2(cookie: string) {
-  const scenario = TEST_SCENARIOS.scenario2;
+async function personaTestScenario2(cookie: string) {
+  const scenario = PERSONA_TEST_SCENARIOS.scenario2;
   console.log(`\n📋 ${scenario.name}`);
   console.log('='.repeat(60));
 
   // 获取人设和角色
-  const personas = await getPersonas(cookie);
-  const characters = await getCharacters(cookie);
+  const personas = await personaTestGetPersonas(cookie);
+  const characters = await personaTestGetCharacters(cookie);
 
   const personaA = personas.find(p => p.name === scenario.personaA.name);
   const personaB = personas.find(p => p.name === scenario.personaB.name);
@@ -249,39 +248,39 @@ async function testScenario2(cookie: string) {
 
   // 步骤 1: 人设 A 对话
   console.log(`\n📝 步骤 1: 与人设 A 对话`);
-  const sessionA = await createSession(cookie, personaA.id, character.id);
+  const sessionA = await personaTestCreateSession(cookie, personaA.id, character.id);
   console.log(`✓ 创建会话 A: ${sessionA}`);
 
   for (const fact of scenario.personaA.facts) {
     console.log(`  发送: "${fact.message}"`);
-    const reply = await sendMessage(cookie, personaA.id, sessionA, fact.message);
+    const reply = await personaTestSendMessage(cookie, personaA.id, sessionA, fact.message);
     console.log(`  回复: "${reply.substring(0, 50)}..."`);
   }
 
-  await waitForMemoryStorage();
+  await personaTestWaitForMemoryStorage();
 
   // 步骤 2: 人设 B 对话
   console.log(`\n📝 步骤 2: 与人设 B 对话`);
-  const sessionB = await createSession(cookie, personaB.id, character.id);
+  const sessionB = await personaTestCreateSession(cookie, personaB.id, character.id);
   console.log(`✓ 创建会话 B: ${sessionB}`);
 
   for (const fact of scenario.personaB.facts) {
     console.log(`  发送: "${fact.message}"`);
-    const reply = await sendMessage(cookie, personaB.id, sessionB, fact.message);
+    const reply = await personaTestSendMessage(cookie, personaB.id, sessionB, fact.message);
     console.log(`  回复: "${reply.substring(0, 50)}..."`);
   }
 
-  await waitForMemoryStorage();
+  await personaTestWaitForMemoryStorage();
 
   // 步骤 3: 验证记忆隔离
   console.log(`\n🔍 步骤 3: 验证记忆隔离`);
 
   // 查询人设 A 的记忆
-  const memoriesA = await getMemories(cookie, personaA.id, character.id);
+  const memoriesA = await personaTestGetMemories(cookie, personaA.id, character.id);
   console.log(`✓ 人设 A 的记忆数量: ${memoriesA.length}`);
 
   // 查询人设 B 的记忆
-  const memoriesB = await getMemories(cookie, personaB.id, character.id);
+  const memoriesB = await personaTestGetMemories(cookie, personaB.id, character.id);
   console.log(`✓ 人设 B 的记忆数量: ${memoriesB.length}`);
 
   // 验证人设 A 的记忆
@@ -291,7 +290,7 @@ async function testScenario2(cookie: string) {
   const hasShanghaiInA = memoryAContent.includes('上海');
   const hasArtistInA = memoryAContent.includes('插画师');
 
-  results.push({
+  personaTestResults.push({
     scenario: scenario.name,
     test: '人设 A 记忆包含"台北"',
     passed: hasTaipeiInA,
@@ -299,7 +298,7 @@ async function testScenario2(cookie: string) {
     details: { memories: memoriesA }
   });
 
-  results.push({
+  personaTestResults.push({
     scenario: scenario.name,
     test: '人设 A 记忆包含"软件工程师"',
     passed: hasEngineerInA,
@@ -307,7 +306,7 @@ async function testScenario2(cookie: string) {
     details: { memories: memoriesA }
   });
 
-  results.push({
+  personaTestResults.push({
     scenario: scenario.name,
     test: '人设 A 记忆不包含"上海"（隔离验证）',
     passed: !hasShanghaiInA,
@@ -315,7 +314,7 @@ async function testScenario2(cookie: string) {
     details: { memories: memoriesA }
   });
 
-  results.push({
+  personaTestResults.push({
     scenario: scenario.name,
     test: '人设 A 记忆不包含"插画师"（隔离验证）',
     passed: !hasArtistInA,
@@ -330,7 +329,7 @@ async function testScenario2(cookie: string) {
   const hasTaipeiInB = memoryBContent.includes('台北');
   const hasEngineerInB = memoryBContent.includes('软件工程师') || memoryBContent.includes('工程师');
 
-  results.push({
+  personaTestResults.push({
     scenario: scenario.name,
     test: '人设 B 记忆包含"上海"',
     passed: hasShanghaiInB,
@@ -338,7 +337,7 @@ async function testScenario2(cookie: string) {
     details: { memories: memoriesB }
   });
 
-  results.push({
+  personaTestResults.push({
     scenario: scenario.name,
     test: '人设 B 记忆包含"插画师"',
     passed: hasArtistInB,
@@ -346,7 +345,7 @@ async function testScenario2(cookie: string) {
     details: { memories: memoriesB }
   });
 
-  results.push({
+  personaTestResults.push({
     scenario: scenario.name,
     test: '人设 B 记忆不包含"台北"（隔离验证）',
     passed: !hasTaipeiInB,
@@ -354,7 +353,7 @@ async function testScenario2(cookie: string) {
     details: { memories: memoriesB }
   });
 
-  results.push({
+  personaTestResults.push({
     scenario: scenario.name,
     test: '人设 B 记忆不包含"软件工程师"（隔离验证）',
     passed: !hasEngineerInB,
@@ -364,14 +363,14 @@ async function testScenario2(cookie: string) {
 }
 
 // 测试场景 3：同用户 + 不同人设 + 不同角色
-async function testScenario3(cookie: string) {
-  const scenario = TEST_SCENARIOS.scenario3;
+async function personaTestScenario3(cookie: string) {
+  const scenario = PERSONA_TEST_SCENARIOS.scenario3;
   console.log(`\n📋 ${scenario.name}`);
   console.log('='.repeat(60));
 
   // 获取人设和角色
-  const personas = await getPersonas(cookie);
-  const characters = await getCharacters(cookie);
+  const personas = await personaTestGetPersonas(cookie);
+  const characters = await personaTestGetCharacters(cookie);
 
   const combinations = scenario.combinations.map(combo => {
     const persona = personas.find(p => p.name === combo.personaName);
@@ -393,39 +392,39 @@ async function testScenario3(cookie: string) {
 
   // 步骤 1: 组合 1 对话
   console.log(`\n📝 步骤 1: 与组合 1 对话`);
-  const session1 = await createSession(cookie, combinations[0].persona.id, combinations[0].character.id);
+  const session1 = await personaTestCreateSession(cookie, combinations[0].persona.id, combinations[0].character.id);
   console.log(`✓ 创建会话 1: ${session1}`);
 
   for (const fact of combinations[0].facts) {
     console.log(`  发送: "${fact.message}"`);
-    const reply = await sendMessage(cookie, combinations[0].persona.id, session1, fact.message);
+    const reply = await personaTestSendMessage(cookie, combinations[0].persona.id, session1, fact.message);
     console.log(`  回复: "${reply.substring(0, 50)}..."`);
   }
 
-  await waitForMemoryStorage();
+  await personaTestWaitForMemoryStorage();
 
   // 步骤 2: 组合 2 对话
   console.log(`\n📝 步骤 2: 与组合 2 对话`);
-  const session2 = await createSession(cookie, combinations[1].persona.id, combinations[1].character.id);
+  const session2 = await personaTestCreateSession(cookie, combinations[1].persona.id, combinations[1].character.id);
   console.log(`✓ 创建会话 2: ${session2}`);
 
   for (const fact of combinations[1].facts) {
     console.log(`  发送: "${fact.message}"`);
-    const reply = await sendMessage(cookie, combinations[1].persona.id, session2, fact.message);
+    const reply = await personaTestSendMessage(cookie, combinations[1].persona.id, session2, fact.message);
     console.log(`  回复: "${reply.substring(0, 50)}..."`);
   }
 
-  await waitForMemoryStorage();
+  await personaTestWaitForMemoryStorage();
 
   // 步骤 3: 验证记忆隔离
   console.log(`\n🔍 步骤 3: 验证记忆隔离`);
 
   // 查询组合 1 的记忆
-  const memories1 = await getMemories(cookie, combinations[0].persona.id, combinations[0].character.id);
+  const memories1 = await personaTestGetMemories(cookie, combinations[0].persona.id, combinations[0].character.id);
   console.log(`✓ 组合 1 的记忆数量: ${memories1.length}`);
 
   // 查询组合 2 的记忆
-  const memories2 = await getMemories(cookie, combinations[1].persona.id, combinations[1].character.id);
+  const memories2 = await personaTestGetMemories(cookie, combinations[1].persona.id, combinations[1].character.id);
   console.log(`✓ 组合 2 的记忆数量: ${memories2.length}`);
 
   // 验证组合 1 的记忆
@@ -435,7 +434,7 @@ async function testScenario3(cookie: string) {
   const hasFrenchIn1 = memory1Content.includes('法语');
   const hasMovieIn1 = memory1Content.includes('电影');
 
-  results.push({
+  personaTestResults.push({
     scenario: scenario.name,
     test: '组合 1 记忆包含"日语"',
     passed: hasJapaneseIn1,
@@ -443,7 +442,7 @@ async function testScenario3(cookie: string) {
     details: { memories: memories1 }
   });
 
-  results.push({
+  personaTestResults.push({
     scenario: scenario.name,
     test: '组合 1 记忆包含"动漫"',
     passed: hasAnimeIn1,
@@ -451,7 +450,7 @@ async function testScenario3(cookie: string) {
     details: { memories: memories1 }
   });
 
-  results.push({
+  personaTestResults.push({
     scenario: scenario.name,
     test: '组合 1 记忆不包含"法语"（隔离验证）',
     passed: !hasFrenchIn1,
@@ -459,7 +458,7 @@ async function testScenario3(cookie: string) {
     details: { memories: memories1 }
   });
 
-  results.push({
+  personaTestResults.push({
     scenario: scenario.name,
     test: '组合 1 记忆不包含"电影"（隔离验证）',
     passed: !hasMovieIn1,
@@ -474,7 +473,7 @@ async function testScenario3(cookie: string) {
   const hasJapaneseIn2 = memory2Content.includes('日语');
   const hasAnimeIn2 = memory2Content.includes('动漫');
 
-  results.push({
+  personaTestResults.push({
     scenario: scenario.name,
     test: '组合 2 记忆包含"法语"',
     passed: hasFrenchIn2,
@@ -482,7 +481,7 @@ async function testScenario3(cookie: string) {
     details: { memories: memories2 }
   });
 
-  results.push({
+  personaTestResults.push({
     scenario: scenario.name,
     test: '组合 2 记忆包含"电影"',
     passed: hasMovieIn2,
@@ -490,7 +489,7 @@ async function testScenario3(cookie: string) {
     details: { memories: memories2 }
   });
 
-  results.push({
+  personaTestResults.push({
     scenario: scenario.name,
     test: '组合 2 记忆不包含"日语"（隔离验证）',
     passed: !hasJapaneseIn2,
@@ -498,7 +497,7 @@ async function testScenario3(cookie: string) {
     details: { memories: memories2 }
   });
 
-  results.push({
+  personaTestResults.push({
     scenario: scenario.name,
     test: '组合 2 记忆不包含"动漫"（隔离验证）',
     passed: !hasAnimeIn2,
@@ -508,28 +507,28 @@ async function testScenario3(cookie: string) {
 }
 
 // 主函数
-async function main() {
+async function personaTestMain() {
   console.log('🚀 人设记忆隔离测试');
   console.log('='.repeat(60));
-  console.log(`测试环境: ${BASE_URL}`);
-  console.log(`测试用户: ${TEST_USER_EMAIL}`);
+  console.log(`测试环境: ${PERSONA_TEST_BASE_URL}`);
+  console.log(`测试用户: ${PERSONA_TEST_USER_EMAIL}`);
   console.log('');
 
   try {
     // 登录
-    const cookie = await login();
+    const cookie = await personaTestLogin();
 
     // 运行测试场景
-    await testScenario2(cookie);
-    await testScenario3(cookie);
+    await personaTestScenario2(cookie);
+    await personaTestScenario3(cookie);
 
     // 输出测试结果
     console.log('\n' + '='.repeat(60));
     console.log('📊 测试结果汇总');
     console.log('='.repeat(60));
 
-    const passedTests = results.filter(r => r.passed).length;
-    const totalTests = results.length;
+    const passedTests = personaTestResults.filter(r => r.passed).length;
+    const totalTests = personaTestResults.length;
     const passRate = ((passedTests / totalTests) * 100).toFixed(1);
 
     console.log(`\n总测试数: ${totalTests}`);
@@ -538,7 +537,7 @@ async function main() {
     console.log(`通过率: ${passRate}%`);
 
     console.log('\n详细结果:');
-    for (const result of results) {
+    for (const result of personaTestResults) {
       console.log(`\n${result.message}`);
       console.log(`  场景: ${result.scenario}`);
       console.log(`  测试: ${result.test}`);
@@ -550,14 +549,14 @@ async function main() {
     // 保存测试报告
     const report = {
       timestamp: new Date().toISOString(),
-      environment: BASE_URL,
+      environment: PERSONA_TEST_BASE_URL,
       summary: {
         total: totalTests,
         passed: passedTests,
         failed: totalTests - passedTests,
         passRate: `${passRate}%`
       },
-      results
+      personaTestResults
     };
 
     const reportPath = `./test-results/persona-isolation-${Date.now()}.json`;
@@ -575,4 +574,4 @@ async function main() {
 }
 
 // 运行测试
-main();
+personaTestMain();

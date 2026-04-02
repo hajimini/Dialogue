@@ -1,7 +1,7 @@
 import { Pool, type PoolConfig, type QueryResultRow } from "pg";
 
 declare global {
-  // eslint-disable-next-line no-var
+   
   var __aiCompanionPgPool: Pool | undefined;
 }
 

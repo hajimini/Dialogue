@@ -68,10 +68,6 @@ function extractConsoleMarker(output, marker) {
   return line.slice(index + marker.length);
 }
 
-function normalizeMemoryLogsResponse(payload) {
-  const rows = payload?.data?.logs ?? payload?.data ?? payload?.logs ?? [];
-  return Array.isArray(rows) ? rows : [];
-}
 
 async function runDatabaseChecks(browserResult) {
   const client = new pg.Client({

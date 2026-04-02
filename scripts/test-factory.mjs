@@ -12,7 +12,7 @@ console.log('=== Memory Gateway Factory Test ===\n');
 console.log('Test 1: Default Provider (mem0)');
 console.log('---');
 try {
-  const gateway = getMemoryGateway();
+  getMemoryGateway();
   console.error('✗ Should have thrown an error (Mem0Adapter not yet implemented)\n');
 } catch (error) {
   if (error.message.includes('Mem0Adapter is not yet implemented')) {
@@ -31,7 +31,7 @@ const originalProvider = process.env.MEMORY_PROVIDER;
 try {
   resetMemoryGateway();
   process.env.MEMORY_PROVIDER = 'letta';
-  const gateway = getMemoryGateway();
+  getMemoryGateway();
   console.error('✗ Should have thrown an error (Letta not yet supported)\n');
 } catch (error) {
   if (error.message.includes("Memory provider 'letta' is not yet supported")) {
