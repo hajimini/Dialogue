@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 type Character = {
   id: string;
@@ -14,6 +14,7 @@ type Character = {
 
 export default function CharactersPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [characters, setCharacters] = useState<Character[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -95,6 +96,24 @@ export default function CharactersPage() {
   }
 
   function handleSelectCharacter(characterId: string) {
+    const personaId = searchParams.get("personaId")?.trim();
+    const returnTo = searchParams.get("returnTo")?.trim();
+
+    if (personaId) {
+      localStorage.setItem(`selected_character_${personaId}`, characterId);
+    }
+
+    if (returnTo && returnTo.startsWith("/")) {
+      localStorage.setItem("selected_character_id", characterId);
+      router.push(returnTo);
+      return;
+    }
+
+    if (personaId) {
+      localStorage.setItem("selected_character_id", characterId);
+      router.push(`/chat/${personaId}?newSession=1`);
+      return;
+    }
     // 保存选中的角色到 localStorage
     localStorage.setItem("selected_character_id", characterId);
     // 返回上一页或跳转到首页

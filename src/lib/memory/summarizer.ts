@@ -1,7 +1,7 @@
 import { generateClaudeJson } from "@/lib/ai/claude";
 import {
   ensureSessionHasUsableCharacter,
-  listSessionMessages,
+  getRecentSessionMessages,
   updateSessionSummary,
 } from "@/lib/chat/sessions";
 import { saveSessionMemories } from "@/lib/memory/long-term";
@@ -62,6 +62,10 @@ type DeterministicFactExtraction = {
   favoriteFlower: string | null;
   seasideWeekend: boolean;
 };
+
+function isMediaPlaceholder(content: string) {
+  return /^\[(?:圖片|照片|貼圖)\]$/.test(content.trim());
+}
 
 function extractDeterministicFacts(messages: MessageRecord[]): DeterministicFactExtraction {
   const userTexts = messages
@@ -348,6 +352,7 @@ function sanitizeSummaryResult(
 
 async function summarizeMessages(persona: Persona, messages: MessageRecord[]) {
   const transcript = messages
+    .filter((message) => !isMediaPlaceholder(message.content))
     .map((message) => `${message.role}: ${message.content}`)
     .join("\n");
   const canonicalIdentity = buildCanonicalIdentityLines(persona);
@@ -426,9 +431,9 @@ export async function maybeRefreshSessionMemory(input: {
   persona: Persona;
   session: SessionRecord | { id: string; summary?: string | null; character_id?: string | null };
 }) {
-  const messages = await listSessionMessages(input.session.id, 120, {
+  const messages = (await getRecentSessionMessages(input.session.id, 120, {
     userId: input.userId,
-  });
+  })).filter((message) => !isMediaPlaceholder(message.content));
 
   if (messages.length < 2) {
     return null;

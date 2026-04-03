@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import MessageItem from "@/components/MessageItem";
 import {
   MemoryContextPanel,
   type MemoryContextItem,
@@ -108,6 +109,7 @@ export default function ChatWithPersona({
   initialMessages,
   characters,
   requiresCharacterSelection,
+  initialShowNewSessionDialog,
 }: {
   persona: Persona;
   personas: PersonaListItem[];
@@ -117,6 +119,7 @@ export default function ChatWithPersona({
   initialMessages: MessageRecord[];
   characters: Array<{ id: string; name: string }>;
   requiresCharacterSelection: boolean;
+  initialShowNewSessionDialog: boolean;
 }) {
   const [currentSessionId, setCurrentSessionId] = useState(initialSessionId);
   const [sessions, setSessions] = useState<SessionListItem[]>(sortSessions(initialSessions));
@@ -136,7 +139,9 @@ export default function ChatWithPersona({
   );
 
   const [showAllSessions, setShowAllSessions] = useState(false);
-  const [showNewSessionDialog, setShowNewSessionDialog] = useState(requiresCharacterSelection);
+  const [showNewSessionDialog, setShowNewSessionDialog] = useState(
+    requiresCharacterSelection || initialShowNewSessionDialog,
+  );
   const [sessionMemoryContext, setSessionMemoryContext] = useState<SessionMemoryContext | null>(
     null,
   );
@@ -390,7 +395,7 @@ export default function ChatWithPersona({
     setIsDeletingSessionId(sessionId);
 
     try {
-      const response = await fetch(`/api/sessions/${sessionId}`, {
+      const response = await fetch(`/api/sessions/${sessionId}?purge=1`, {
         method: "DELETE",
       });
       const json = (await response.json()) as {
@@ -444,7 +449,7 @@ export default function ChatWithPersona({
     setIsClearingSessions(true);
 
     try {
-      const response = await fetch(`/api/personas/${persona.id}/sessions`, {
+      const response = await fetch(`/api/personas/${persona.id}/sessions?purge=1`, {
         method: "DELETE",
       });
       const json = (await response.json()) as {
@@ -470,18 +475,7 @@ export default function ChatWithPersona({
     }
   }
 
-  const handleInputChange = useCallback((event: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setInput(event.target.value);
-  }, []);
-
-  const handleKeyDown = useCallback((event: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (event.key === "Enter" && !event.shiftKey) {
-      event.preventDefault();
-      void handleSend();
-    }
-  }, [handleSend]);
-
-  async function handleSend() {
+  const handleSend = useCallback(async () => {
     const text = input.trim();
     if (!text || !currentSessionId || isSwitchingSession) return;
 
@@ -580,7 +574,18 @@ export default function ChatWithPersona({
     } finally {
       setIsLoading(false);
     }
-  }
+  }, [input, currentSessionId, isSwitchingSession, persona.id, refreshSessionList]);
+
+  const handleInputChange = useCallback((event: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setInput(event.target.value);
+  }, []);
+
+  const handleKeyDown = useCallback((event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault();
+      void handleSend();
+    }
+  }, [handleSend]);
 
   async function submitMemoryFeedback(memoryId: string) {
     if (submittingMemoryFeedbackId === memoryId) return;
@@ -635,12 +640,24 @@ export default function ChatWithPersona({
     }
   }
 
+  const handleToggleDownvote = useCallback((messageId: string) => {
+    setPendingDownvoteFor((current) => current === messageId ? null : messageId);
+  }, []);
+
   async function submitFeedback(
     messageId: string,
     feedbackType: FeedbackValue,
     feedbackReason?: string,
   ) {
     if (submittingFeedbackFor === messageId) return;
+
+    console.log('[Frontend Debug]', {
+      messageId,
+      feedbackType,
+      feedbackReason,
+      persona_id: persona.id,
+      session_id: currentSessionId,
+    });
 
     setSubmittingFeedbackFor(messageId);
 
@@ -677,6 +694,10 @@ export default function ChatWithPersona({
       setSubmittingFeedbackFor(null);
     }
   }
+
+  const handleSubmitFeedback = useCallback((messageId: string, type: FeedbackValue, reason?: string) => {
+    void submitFeedback(messageId, type, reason);
+  }, [persona.id, currentSessionId, submittingFeedbackFor]);
 
   useEffect(() => {
     if (requiresCharacterSelection && !currentSessionId && sessions.length === 0) {
@@ -994,90 +1015,18 @@ export default function ChatWithPersona({
                 const showDownvoteReasons = pendingDownvoteFor === message.id && !feedback;
 
                 return (
-                  <div
+                  <MessageItem
                     key={message.id}
-                    className={`flex ${isUser ? "justify-end" : "justify-start"}`}
-                  >
-                    <div className="max-w-[78%]">
-                      <div
-                        className={[
-                          "mb-1 px-1 text-[11px] text-[#6c7f77]",
-                          isUser ? "text-right" : "text-left",
-                        ].join(" ")}
-                      >
-                        {isUser ? "你" : persona.name}
-                      </div>
-
-                      <div
-                        className={[
-                          "whitespace-pre-wrap rounded-[22px] border px-4 py-3 text-sm leading-relaxed shadow-[0_10px_30px_rgba(15,40,30,0.04)]",
-                          isUser
-                            ? "rounded-tr-none border-[#b7e6b9] bg-[#d7f1d8] text-[#0b3320]"
-                            : "rounded-tl-none border-[#e7f1ec] bg-white text-[#0b141a]",
-                        ].join(" ")}
-                      >
-                        {message.content}
-                      </div>
-
-                      <div
-                        className={[
-                          "mt-1 flex items-center gap-2 px-1 text-[10px]",
-                          isUser ? "justify-end text-[#2c6b58]" : "justify-between text-[#7b8f87]",
-                        ].join(" ")}
-                      >
-                        <span>{formatTime(message.createdAt)}</span>
-
-                        {!isUser && message.persisted ? (
-                          <div className="flex items-center gap-2 text-[11px]">
-                            {feedback ? (
-                              <span className="rounded-full bg-[#edf7f2] px-2 py-1 text-[#2d6b57]">
-                                {feedback === "up" ? "已点赞" : "已记录反馈"}
-                              </span>
-                            ) : (
-                              <>
-                                <button
-                                  type="button"
-                                  disabled={submittingFeedbackFor === message.id}
-                                  onClick={() => void submitFeedback(message.id, "up")}
-                                  className="rounded-full border border-[#d7e9e1] bg-white px-2 py-1 transition-colors hover:border-[#b7d8cb] hover:bg-[#f4fbf7] disabled:opacity-50"
-                                >
-                                  👍
-                                </button>
-                                <button
-                                  type="button"
-                                  disabled={submittingFeedbackFor === message.id}
-                                  onClick={() =>
-                                    setPendingDownvoteFor((current) =>
-                                      current === message.id ? null : message.id,
-                                    )
-                                  }
-                                  className="rounded-full border border-[#d7e9e1] bg-white px-2 py-1 transition-colors hover:border-[#b7d8cb] hover:bg-[#f4fbf7] disabled:opacity-50"
-                                >
-                                  👎
-                                </button>
-                              </>
-                            )}
-                          </div>
-                        ) : null}
-                      </div>
-
-                      {showDownvoteReasons ? (
-                        <div className="mt-2 flex flex-wrap gap-2">
-                          {DOWN_REASONS.map((reason) => (
-                            <button
-                              key={reason}
-                              type="button"
-                              disabled={submittingFeedbackFor === message.id}
-                              onClick={() => void submitFeedback(message.id, "down", reason)}
-                              className="rounded-full border border-[#d8e9e2] bg-white px-3 py-1 text-xs text-[#31574a] transition-colors hover:bg-[#f3fbf7] disabled:opacity-50"
-                            >
-                              {reason}
-                            </button>
-                          ))}
-                        </div>
-                      ) : null}
-                    </div>
-                  </div>
+                    message={message}
+                    personaName={persona.name}
+                    isUser={isUser}
+                    feedback={feedback}
+                    showDownvoteReasons={showDownvoteReasons}
+                    submittingFeedbackFor={submittingFeedbackFor}
+                    onSubmitFeedback={handleSubmitFeedback}
+                    onToggleDownvote={handleToggleDownvote}
+                    formatTime={formatTime}
+                  />
                 );
               })}
 

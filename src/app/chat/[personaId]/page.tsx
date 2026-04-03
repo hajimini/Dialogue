@@ -20,13 +20,16 @@ export default async function ChatPage({
   searchParams,
 }: {
   params: Promise<{ personaId: string }>;
-  searchParams: Promise<{ session?: string | string[] }>;
+  searchParams: Promise<{ session?: string | string[]; newSession?: string | string[] }>;
 }) {
   const { personaId } = await params;
   const resolvedSearchParams = await searchParams;
   const requestedSessionId = Array.isArray(resolvedSearchParams.session)
     ? resolvedSearchParams.session[0]
     : resolvedSearchParams.session;
+  const requestedNewSession = Array.isArray(resolvedSearchParams.newSession)
+    ? resolvedSearchParams.newSession[0]
+    : resolvedSearchParams.newSession;
   const user = await requireAuthenticatedUser(
     requestedSessionId
       ? `/chat/${personaId}?session=${encodeURIComponent(requestedSessionId)}`
@@ -81,6 +84,7 @@ export default async function ChatPage({
       initialMessages={bootstrap.messages as MessageRecord[]}
       requiresCharacterSelection={bootstrap.requiresCharacterSelection}
       characters={(characters ?? []) as Array<{ id: string; name: string }>}
+      initialShowNewSessionDialog={requestedNewSession === "1" || requestedNewSession === "true"}
     />
   );
 }

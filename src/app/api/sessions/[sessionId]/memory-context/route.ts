@@ -6,7 +6,7 @@ import {
 } from "@/lib/chat/sessions";
 import { getMemoryContext } from "@/lib/memory/retriever";
 import { queryPostgres } from "@/lib/postgres";
-import type { Persona } from "@/lib/supabase/types";
+import type { MemoryRecord, Persona } from "@/lib/supabase/types";
 
 export async function GET(
   _req: Request,
@@ -116,15 +116,51 @@ export async function GET(
       messageCount: recentMessages.length,
     });
 
+    let displayMemories = memoryContext.relevantMemories;
+    if (displayMemories.length === 0) {
+      const sessionMemories = await queryPostgres<{
+        id: string;
+        memory_type: string;
+        content: string;
+        created_at: string | null;
+      }>(
+        `
+          select id, memory_type, content, created_at
+          from memories
+          where source_session_id = $1
+          order by created_at desc nulls last
+          limit 3
+        `,
+        [currentSession.id],
+      );
+
+      displayMemories = sessionMemories.rows.map((memory): MemoryRecord => ({
+        id: memory.id,
+        user_id: user.id,
+        persona_id: currentSession.persona_id,
+        memory_type: memory.memory_type as MemoryRecord["memory_type"],
+        content: memory.content,
+        embedding: null,
+        importance: 0.5,
+        source_session_id: currentSession.id,
+        similarity_score: 0,
+        reranker_score: undefined,
+        final_rank: undefined,
+        created_at: memory.created_at,
+        updated_at: memory.created_at,
+      }));
+    }
+
     console.log('[MemoryContext] 记忆上下文获取完成:', {
       relevantMemoriesCount: memoryContext.relevantMemories.length,
+      displayMemoriesCount: displayMemories.length,
       hasUserProfile: Boolean(memoryContext.userProfile),
       recentSummariesCount: memoryContext.recentSummaries.length,
     });
 
-    if (memoryContext.relevantMemories.length > 0) {
+    if (displayMemories.length > 0) {
       console.log('[MemoryContext] 记忆列表:');
-      memoryContext.relevantMemories.slice(0, 3).forEach((mem, idx) => {
+      displayMemories.slice(0, 3).forEach((mem, idx) => {
         console.log(`  ${idx + 1}. [${mem.memory_type}] ${mem.content.substring(0, 40)}...`);
       });
     }
@@ -132,7 +168,7 @@ export async function GET(
     return NextResponse.json({
       success: true,
       data: {
-        memories: memoryContext.relevantMemories.slice(0, 3).map((memory) => ({
+        memories: displayMemories.slice(0, 3).map((memory) => ({
           id: memory.id,
           content: memory.content,
           memory_type: memory.memory_type,

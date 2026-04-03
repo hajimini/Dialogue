@@ -16,6 +16,7 @@ type ImportedMessage = {
   role: "user" | "assistant";
   content: string;
   timestamp?: string;
+  createdAt?: string;
 };
 
 // 解析 Line 导出的对话记录
@@ -62,10 +63,10 @@ function parseLineChat(text: string, personaName: string): ImportedMessage[] {
 
   // 如果没找到匹配的，使用发言次数最多的作为人设（通常AI回复更多）
   if (!personaSender && senderCounts.size > 0) {
-    let maxCount = 0;
+    let fallbackCount = Number.POSITIVE_INFINITY;
     for (const [sender, count] of senderCounts.entries()) {
-      if (count > maxCount) {
-        maxCount = count;
+      if (count < fallbackCount) {
+        fallbackCount = count;
         personaSender = sender;
       }
     }
@@ -95,6 +96,142 @@ function parseLineChat(text: string, personaName: string): ImportedMessage[] {
         timestamp: time
       });
     }
+  }
+
+  return messages;
+}
+
+function parseLineChatWithDates(text: string, personaName: string): ImportedMessage[] {
+  const lines = text.split(/\r?\n/);
+  const senderCounts = new Map<string, number>();
+  const ignoredContents = new Set(["貼圖", "圖片", "照片", "貼圖貼紙"]);
+  let currentDate: string | null = null;
+  let sequence = 0;
+  const normalizeImportedContent = (content: string) => {
+    const value = content.trim();
+    if (value === "璨煎湒" || value === "璨煎湒璨肩礄") return "[貼圖]";
+    if (value === "鍦栫墖") return "[圖片]";
+    if (value === "鐓х墖") return "[照片]";
+    return value;
+  };
+
+  function parseDateHeading(line: string) {
+    const match = line.match(/^(\d{4})[./-](\d{1,2})[./-](\d{1,2})/);
+    if (!match) return null;
+    const [, year, month, day] = match;
+    return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+  }
+
+  function buildCreatedAt(date: string | null, time: string) {
+    if (!date) return undefined;
+    const base = new Date(`${date}T${time}:00+08:00`);
+    if (Number.isNaN(base.getTime())) return undefined;
+    const createdAt = new Date(base.getTime() + sequence);
+    sequence += 1;
+    return createdAt.toISOString();
+  }
+
+  function timeToMinutes(time: string) {
+    const [hour, minute] = time.split(":").map(Number);
+    return hour * 60 + minute;
+  }
+
+  function shiftDateByDays(date: string, days: number) {
+    const base = new Date(`${date}T00:00:00+08:00`);
+    base.setDate(base.getDate() + days);
+    return base.toISOString().slice(0, 10);
+  }
+
+  function normalizeSenderIdentity(value: string) {
+    return value
+      .normalize("NFKC")
+      .replace(/[^\p{L}\p{N}\u4e00-\u9fa5]/gu, "")
+      .toLowerCase();
+  }
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+
+    const parsedDate = parseDateHeading(trimmed);
+    if (parsedDate) {
+      currentDate = parsedDate;
+      continue;
+    }
+
+    const match = trimmed.match(/^(\d{2}:\d{2})\s+(\S+(?:\s+\S+)*?)\s+(.+)$/);
+    if (!match) continue;
+
+    const [, , sender, content] = match;
+    if (!normalizeImportedContent(content)) continue;
+    senderCounts.set(sender, (senderCounts.get(sender) || 0) + 1);
+  }
+
+  let personaSender = "";
+  if (personaName) {
+    const normalizedPersonaName = normalizeSenderIdentity(personaName);
+    for (const sender of senderCounts.keys()) {
+      const normalizedSender = normalizeSenderIdentity(sender);
+      if (
+        sender.includes(personaName) ||
+        personaName.includes(sender) ||
+        (normalizedPersonaName &&
+          normalizedSender &&
+          (normalizedSender.includes(normalizedPersonaName) ||
+            normalizedPersonaName.includes(normalizedSender)))
+      ) {
+        personaSender = sender;
+        break;
+      }
+    }
+  }
+
+  if (!personaSender && senderCounts.size > 0) {
+    let maxCount = 0;
+    for (const [sender, count] of senderCounts.entries()) {
+      if (count > maxCount) {
+        maxCount = count;
+        personaSender = sender;
+      }
+    }
+  }
+
+  currentDate = null;
+  sequence = 0;
+  let lastSeenMinutes: number | null = null;
+  const messages: ImportedMessage[] = [];
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+
+    const parsedDate = parseDateHeading(trimmed);
+    if (parsedDate) {
+      currentDate = parsedDate;
+      continue;
+    }
+
+    const match = trimmed.match(/^(\d{2}:\d{2})\s+(\S+(?:\s+\S+)*?)\s+(.+)$/);
+    if (!match) continue;
+
+    const [, time, sender, content] = match;
+    const normalizedContent = normalizeImportedContent(content);
+    if (!normalizedContent) continue;
+
+    if (currentDate) {
+      const currentMinutes = timeToMinutes(time);
+      if (lastSeenMinutes !== null && currentMinutes < lastSeenMinutes) {
+        currentDate = shiftDateByDays(currentDate, 1);
+      }
+      lastSeenMinutes = currentMinutes;
+    }
+
+    messages.push({
+      role: sender === personaSender ? "assistant" : "user",
+      content: normalizedContent,
+      timestamp: time,
+      createdAt: buildCreatedAt(currentDate, time),
+    });
   }
 
   return messages;
@@ -140,7 +277,7 @@ export async function POST(request: NextRequest) {
     const text = await file.text();
 
     // 解析对话记录
-    const messages = parseLineChat(text, personaName || "");
+    const messages = parseLineChatWithDates(text, personaName || "");
 
     if (messages.length === 0) {
       return NextResponse.json(
@@ -221,6 +358,7 @@ export async function POST(request: NextRequest) {
         session_id: session.id,
         role: msg.role,
         content: msg.content,
+        created_at: msg.createdAt ?? undefined,
       }));
 
       const { error: messagesError } = await supabase
@@ -232,6 +370,18 @@ export async function POST(request: NextRequest) {
       }
 
       insertedCount += batch.length;
+    }
+
+    const lastImportedAt =
+      [...messages]
+        .reverse()
+        .find((message) => Boolean(message.createdAt))?.createdAt ?? null;
+
+    if (lastImportedAt) {
+      await supabase
+        .from("sessions")
+        .update({ last_message_at: lastImportedAt })
+        .eq("id", session.id);
     }
 
     // 验证数据完整性

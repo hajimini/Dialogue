@@ -199,8 +199,7 @@ export default function NewSessionDialog({
               ))}
             </select>
             <a
-              href="/characters"
-              target="_blank"
+              href={`/characters?personaId=${encodeURIComponent(personaId)}&returnTo=${encodeURIComponent(`/chat/${personaId}?newSession=1`)}`}
               className="mt-2 inline-flex items-center gap-1 text-xs text-[#2f7a5b] transition hover:text-[#266349] hover:underline"
             >
               <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">

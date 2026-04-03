@@ -3,7 +3,7 @@ import { getCurrentAppUser } from "@/lib/auth/session";
 import { deleteSession } from "@/lib/chat/sessions";
 
 export async function DELETE(
-  _req: Request,
+  req: Request,
   context: { params: Promise<{ sessionId: string }> },
 ) {
   try {
@@ -16,7 +16,13 @@ export async function DELETE(
     }
 
     const { sessionId } = await context.params;
-    const result = await deleteSession(sessionId, { userId: user.id });
+    const { searchParams } = new URL(req.url);
+    const purgeDerivedArtifacts =
+      searchParams.get("purge") === "1" || searchParams.get("purge") === "true";
+    const result = await deleteSession(sessionId, {
+      userId: user.id,
+      purgeDerivedArtifacts,
+    });
 
     return NextResponse.json({
       success: true,

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCurrentAppUser } from "@/lib/auth/session";
-import { listSessionMessages } from "@/lib/chat/sessions";
+import { getSessionMessageById } from "@/lib/chat/sessions";
 import { createEvaluationLog } from "@/lib/evaluation/logs";
 
 type FeedbackRequest = {
@@ -39,8 +39,9 @@ export async function POST(req: Request) {
       );
     }
 
-    const messages = await listSessionMessages(sessionId, 200, { userId: user.id });
-    const targetMessage = messages.find((item) => item.id === messageId);
+    const targetMessage = await getSessionMessageById(sessionId, messageId, {
+      userId: user.id,
+    });
 
     if (!targetMessage || targetMessage.role !== "assistant") {
       return NextResponse.json(

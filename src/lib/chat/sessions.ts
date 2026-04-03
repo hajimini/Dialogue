@@ -12,6 +12,12 @@ type SessionIdRow = {
   id: string;
 };
 
+type SessionPurgeRow = {
+  id: string;
+  persona_id: string;
+  character_id: string | null;
+};
+
 type CharacterIdRow = {
   id: string;
 };
@@ -286,6 +292,38 @@ export async function listSessionMessages(
   return result.rows;
 }
 
+export async function getSessionMessageById(
+  sessionId: string,
+  messageId: string,
+  options?: { userId?: string; bypassOwnership?: boolean },
+) {
+  const userId = options?.bypassOwnership ? null : await resolveCurrentUserId(options?.userId);
+  const result = options?.bypassOwnership
+    ? await queryPostgres<MessageRecord>(
+        `
+          select m.*
+          from messages m
+          where m.session_id = $1 and m.id = $2
+          limit 1
+        `,
+        [sessionId, messageId],
+      )
+    : await queryPostgres<MessageRecord>(
+        `
+          select m.*
+          from messages m
+          inner join sessions s on s.id = m.session_id
+          where m.session_id = $1
+            and m.id = $2
+            and s.user_id = $3
+          limit 1
+        `,
+        [sessionId, messageId, userId],
+      );
+
+  return result.rows[0] ?? null;
+}
+
 export async function getRecentSessionMessages(
   sessionId: string,
   limit = 20,
@@ -505,14 +543,14 @@ export async function listRecentSessionsForAdmin(limit = 100) {
 
 export async function deleteSession(
   sessionId: string,
-  options?: { userId?: string },
+  options?: { userId?: string; purgeDerivedArtifacts?: boolean },
 ) {
   const userId = await resolveCurrentUserId(options?.userId);
 
   // 先获取 session 信息，用于清理缓存
-  const sessionInfo = await queryPostgres<{ id: string; persona_id: string }>(
+const sessionInfo = await queryPostgres<SessionPurgeRow>(
     `
-      select id, persona_id
+      select id, persona_id, character_id
       from sessions
       where id = $1 and user_id = $2
       limit 1
@@ -537,16 +575,72 @@ export async function deleteSession(
   // 清理记忆上下文缓存
   memoryContextCache.invalidate(userId, session.persona_id);
 
-  return { id: session.id };
+  let purgedProfile = false;
+  let deletedMemoryOperationLogs = 0;
+
+  if (options?.purgeDerivedArtifacts) {
+    const deletedLogs = await queryPostgres<{ id: string }>(
+      `
+        delete from memory_operation_logs
+        where user_id = $1
+          and metadata->>'session_id' = $2
+        returning id
+      `,
+      [userId, sessionId],
+    );
+    deletedMemoryOperationLogs = deletedLogs.rowCount ?? deletedLogs.rows.length;
+
+    if (session.character_id) {
+      const remainingSessions = await queryPostgres<{ count: number }>(
+        `
+          select count(*)::int as count
+          from sessions
+          where user_id = $1
+            and persona_id = $2
+            and character_id = $3
+        `,
+        [userId, session.persona_id, session.character_id],
+      );
+
+      if ((remainingSessions.rows[0]?.count ?? 0) === 0) {
+        const deletedProfiles = await queryPostgres<{ id: string }>(
+          `
+            delete from user_profiles_per_persona
+            where user_id = $1
+              and persona_id = $2
+              and character_id = $3
+            returning id
+          `,
+          [userId, session.persona_id, session.character_id],
+        );
+        purgedProfile = (deletedProfiles.rowCount ?? deletedProfiles.rows.length) > 0;
+      }
+    }
+  }
+
+  return {
+    id: session.id,
+    purgedProfile,
+    deletedMemoryOperationLogs,
+  };
 }
 
 export async function deletePersonaSessions(
   personaId: string,
-  options?: { userId?: string },
+  options?: { userId?: string; purgeDerivedArtifacts?: boolean },
 ) {
   const userId = await resolveCurrentUserId(options?.userId);
 
   // 删除该人设的所有会话（会级联删除 messages 和 memories）
+const existingSessions = await queryPostgres<SessionPurgeRow>(
+    `
+      select id, persona_id, character_id
+      from sessions
+      where persona_id = $1 and user_id = $2
+    `,
+    [personaId, userId],
+  );
+
   const result = await queryPostgres<SessionIdRow>(
     `
       delete from sessions
@@ -559,5 +653,39 @@ export async function deletePersonaSessions(
   // 清理记忆上下文缓存
   memoryContextCache.invalidate(userId, personaId);
 
-  return { deletedCount: result.rowCount ?? result.rows.length };
+  let deletedMemoryOperationLogs = 0;
+  let purgedProfiles = 0;
+
+  if (options?.purgeDerivedArtifacts) {
+    const sessionIds = existingSessions.rows.map((row) => row.id);
+
+    if (sessionIds.length > 0) {
+      const deletedLogs = await queryPostgres<{ id: string }>(
+        `
+          delete from memory_operation_logs
+          where user_id = $1
+            and metadata->>'session_id' = any($2::text[])
+          returning id
+        `,
+        [userId, sessionIds],
+      );
+      deletedMemoryOperationLogs = deletedLogs.rowCount ?? deletedLogs.rows.length;
+    }
+
+    const deletedProfiles = await queryPostgres<{ id: string }>(
+      `
+        delete from user_profiles_per_persona
+        where user_id = $1 and persona_id = $2
+        returning id
+      `,
+      [userId, personaId],
+    );
+    purgedProfiles = deletedProfiles.rowCount ?? deletedProfiles.rows.length;
+  }
+
+  return {
+    deletedCount: result.rowCount ?? result.rows.length,
+    purgedProfiles,
+    deletedMemoryOperationLogs,
+  };
 }

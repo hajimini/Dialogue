@@ -97,7 +97,7 @@ export async function POST(
 }
 
 export async function DELETE(
-  _req: Request,
+  req: Request,
   context: { params: Promise<{ id: string }> },
 ) {
   try {
@@ -110,7 +110,13 @@ export async function DELETE(
     }
 
     const { id } = await context.params;
-    const result = await deletePersonaSessions(id, { userId: user.id });
+    const { searchParams } = new URL(req.url);
+    const purgeDerivedArtifacts =
+      searchParams.get("purge") === "1" || searchParams.get("purge") === "true";
+    const result = await deletePersonaSessions(id, {
+      userId: user.id,
+      purgeDerivedArtifacts,
+    });
 
     return NextResponse.json({
       success: true,
