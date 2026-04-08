@@ -1,0 +1,80 @@
+services:
+  - type: web
+    name: ai-companion
+    runtime: node
+    plan: free
+    autoDeploy: true
+    buildCommand: npm ci && npm run build
+    startCommand: npm run start
+    healthCheckPath: /
+    envVars:
+      - key: NODE_VERSION
+        value: 22.22.0
+      - key: NODE_ENV
+        value: production
+      - key: MEMORY_PROVIDER
+        value: mem0
+      - key: USE_EMBEDDING_API
+        value: "false"
+      - key: EMBEDDING_PROVIDER
+        value: openai
+      - key: EMBEDDING_MODEL
+        value: text-embedding-3-large
+      - key: RERANKER_PROVIDER
+        value: jina
+      - key: MEMORY_RETRIEVAL_LIMIT
+        value: "5"
+      - key: MEMORY_CONTEXT_CACHE_ENABLED
+        value: "true"
+      - key: POSTGRES_SSL
+        value: require
+      - key: DEFAULT_CHAT_MODEL_PROVIDER_ID
+        value: openrouter-free-gptoss20b
+      - key: DIRECT_MODEL_PROVIDERS
+        sync: false
+      - key: DEMO_USER_EMAIL
+        sync: false
+      - key: DEMO_USER_PASSWORD
+        sync: false
+      - key: DEMO_ADMIN_EMAIL
+        sync: false
+      - key: DEMO_ADMIN_PASSWORD
+        sync: false
+      - key: NEXT_PUBLIC_SUPABASE_URL
+        sync: false
+      - key: NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY
+        sync: false
+      - key: NEXT_PUBLIC_SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_KEY
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: MEM0_API_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: EMBEDDING_API_KEY
+        sync: false
+      - key: NVIDIA_API_KEY
+        sync: false
+      - key: RERANKER_API_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: ANTHROPIC_AUTH_TOKEN
+        sync: false
+      - key: ANTHROPIC_BASE_URL
+        sync: false
+      - key: ANTHROPIC_MODEL
+        sync: false
+      - key: ANTHROPIC_DEFAULT_HAIKU_MODEL
+        sync: false
+      - key: ANTHROPIC_FALLBACK_MODEL_PROVIDER_ID
+        sync: false

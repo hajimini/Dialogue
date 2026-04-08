@@ -36,6 +36,13 @@ const MessageItem = React.memo(({
   onToggleDownvote,
   formatTime,
 }: MessageItemProps) => {
+  const assistantSegments = isUser
+    ? [message.content]
+    : message.content
+        .split(/\n+/)
+        .map((segment) => segment.trim())
+        .filter(Boolean);
+
   return (
     <div
       className={`flex ${isUser ? "justify-end" : "justify-start"}`}
@@ -50,15 +57,22 @@ const MessageItem = React.memo(({
           {isUser ? "你" : personaName}
         </div>
 
-        <div
-          className={[
-            "whitespace-pre-wrap rounded-[22px] border px-4 py-3 text-sm leading-relaxed shadow-[0_10px_30px_rgba(15,40,30,0.04)]",
-            isUser
-              ? "rounded-tr-none border-[#b7e6b9] bg-[#d7f1d8] text-[#0b3320]"
-              : "rounded-tl-none border-[#e7f1ec] bg-white text-[#0b141a]",
-          ].join(" ")}
-        >
-          {message.content}
+        <div className="space-y-2">
+          {assistantSegments.map((segment, index) => (
+            <div
+              key={`${message.id}-${index}`}
+              className={[
+                "whitespace-pre-wrap rounded-[22px] border px-4 py-3 text-sm leading-relaxed shadow-[0_10px_30px_rgba(15,40,30,0.04)]",
+                isUser
+                  ? "rounded-tr-none border-[#b7e6b9] bg-[#d7f1d8] text-[#0b3320]"
+                  : index === 0
+                    ? "rounded-tl-none border-[#e7f1ec] bg-white text-[#0b141a]"
+                    : "border-[#e7f1ec] bg-white text-[#0b141a]",
+              ].join(" ")}
+            >
+              {segment}
+            </div>
+          ))}
         </div>
 
         <div

@@ -12,6 +12,7 @@ export async function runPromptDryTest(input: {
   modelProviderId?: string;
   userId?: string | null;
   characterId?: string | null;
+  disableDirectProviderFallback?: boolean;
 }) {
   const activePromptVersion = await getActivePromptVersion(input.promptVersionId);
   const memoryContext = input.userId && input.characterId
@@ -34,19 +35,26 @@ export async function runPromptDryTest(input: {
     ...memoryContext,
     promptVersionId: activePromptVersion.id,
   });
+  const defaultModelProviderId =
+    process.env.DEFAULT_CHAT_MODEL_PROVIDER_ID?.trim() || "";
+  const resolvedModelProviderId = input.modelProviderId || defaultModelProviderId;
 
   const reply = await generateClaudeText({
     system,
     messages: [{ role: "user", content: input.message }],
-    modelProviderId: input.modelProviderId,
+    modelProviderId: resolvedModelProviderId || undefined,
     maxTokens: Number(process.env.ANTHROPIC_MAX_TOKENS || 800),
     temperature: 0.7,
+    disableDirectProviderFallback: input.disableDirectProviderFallback,
   });
+  const cleanedReply = postProcessAssistantReply(reply, input.persona.name, input.message);
+
+  if (!cleanedReply) {
+    throw new Error("Model returned an empty reply after post-processing.");
+  }
 
   return {
-    reply:
-      postProcessAssistantReply(reply, input.persona.name) ||
-      "刚刚那一下有点卡住了，你再给我一句测试消息，我继续接。",
+    reply: cleanedReply,
     promptVersion: activePromptVersion,
     system,
     memoryContext,

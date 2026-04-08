@@ -25,6 +25,14 @@ type ChatRequestBody = {
   model_provider_id?: string;
 };
 
+function isUpstreamModelError(message: string) {
+  return (
+    message.includes("Anthropic") ||
+    message.includes("Direct model") ||
+    message.includes("Model returned an empty reply")
+  );
+}
+
 export async function POST(req: Request) {
   const startTime = Date.now();
   try {
@@ -114,7 +122,7 @@ export async function POST(req: Request) {
         {
           success: false,
           data: null,
-          error: { message: "请先选择角色并创建会话。" },
+          error: { message: "Please create a character and session first." },
         },
         { status: 400 },
       );
@@ -125,7 +133,7 @@ export async function POST(req: Request) {
         {
           success: false,
           data: null,
-          error: { message: "会话未关联角色" },
+          error: { message: "Session has no character assigned." },
         },
         { status: 400 },
       );
@@ -184,9 +192,12 @@ export async function POST(req: Request) {
       maxTokens: Number(process.env.ANTHROPIC_MAX_TOKENS || 200),
       temperature: 0.8,
     });
-    const cleanedReply =
-      postProcessAssistantReply(reply, persona.name) ||
-      "我在。刚刚那一下有点卡住了，你再跟我说一句，我接着听。";
+    const cleanedReply = postProcessAssistantReply(reply, persona.name, message);
+
+    if (!cleanedReply) {
+      throw new Error("Model returned an empty reply after post-processing.");
+    }
+
     const assistantMessage = await insertMessage(
       session.id,
       "assistant",
@@ -196,7 +207,7 @@ export async function POST(req: Request) {
       },
     );
 
-    // Fire-and-forget: 摘要刷新不阻塞响应，失败不影响已成功的聊天
+    // Fire-and-forget: refreshing memory should not block a successful reply.
     maybeRefreshSessionMemory({
       userId: actingUser.id,
       persona: persona as Persona,
@@ -253,7 +264,9 @@ export async function POST(req: Request) {
       message === "The selected session does not belong to this persona." ||
       message === "Session not found."
         ? 400
-        : 500;
+        : isUpstreamModelError(message)
+          ? 502
+          : 500;
     const actingUser = await getCurrentAppUser().catch(() => null);
     await memoryLogger.log({
       timestamp: new Date().toISOString(),

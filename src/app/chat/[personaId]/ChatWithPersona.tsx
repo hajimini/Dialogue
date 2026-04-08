@@ -44,6 +44,23 @@ type SessionMemoryContext = {
 
 const DOWN_REASONS = ["太像 AI", "答非所问", "忘了之前的事", "太长了"] as const;
 
+async function parseApiJson<T>(response: Response, fallbackMessage: string): Promise<T> {
+  const contentType = response.headers.get("content-type") ?? "";
+  const rawText = await response.text();
+
+  if (!contentType.toLowerCase().includes("application/json")) {
+    throw new Error(
+      `${fallbackMessage}（接口返回 ${response.status} ${response.statusText}，且内容不是 JSON）`,
+    );
+  }
+
+  try {
+    return JSON.parse(rawText) as T;
+  } catch {
+    throw new Error(`${fallbackMessage}（接口返回了无效的 JSON）`);
+  }
+}
+
 function newId() {
   return globalThis.crypto?.randomUUID?.() ?? String(Math.random());
 }
@@ -167,11 +184,11 @@ export default function ChatWithPersona({
 
   async function refreshSessionList() {
     const response = await fetch(`/api/personas/${persona.id}/sessions`);
-    const json = (await response.json()) as {
+    const json = await parseApiJson<{
       success: boolean;
       data: SessionListItem[] | null;
       error: { message: string } | null;
-    };
+    }>(response, "鍒锋柊浼氳瘽鍒楄〃澶辫触");
 
     if (!json.success || !json.data) {
       throw new Error(json.error?.message || "刷新会话列表失败");
@@ -182,11 +199,11 @@ export default function ChatWithPersona({
 
   async function loadSessionMessages(sessionId: string) {
     const response = await fetch(`/api/sessions/${sessionId}/messages`);
-    const json = (await response.json()) as {
+    const json = await parseApiJson<{
       success: boolean;
       data: MessageRecord[] | null;
       error: { message: string } | null;
-    };
+    }>(response, "璇诲彇浼氳瘽娑堟伅澶辫触");
 
     if (!json.success || !json.data) {
       throw new Error(json.error?.message || "读取会话消息失败");
@@ -202,7 +219,7 @@ export default function ChatWithPersona({
       cache: "no-store",
       signal,
     });
-    const json = (await response.json()) as {
+    const json = await parseApiJson<{
       success: boolean;
       data:
         | {
@@ -211,7 +228,7 @@ export default function ChatWithPersona({
           }
         | null;
       error: { message: string } | null;
-    };
+    }>(response, "璇诲彇璁板繂涓婁笅鏂囧け璐?");
 
     if (!json.success || !json.data) {
       throw new Error(json.error?.message || "读取记忆上下文失败");
@@ -231,14 +248,14 @@ export default function ChatWithPersona({
   async function checkMemoryGenerationStatus(sessionId: string) {
     try {
       const response = await fetch(`/api/sessions/${sessionId}/memory-status`);
-      const json = (await response.json()) as {
+      const json = await parseApiJson<{
         success: boolean;
         data: {
           memoryCount: number;
           isComplete: boolean;
           estimatedTimeRemaining: number;
         } | null;
-      };
+      }>(response, "妫€鏌ヨ蹇嗙敓鎴愮姸鎬佸け璐?");
 
       if (json.success && json.data) {
         if (!json.data.isComplete) {
@@ -317,7 +334,7 @@ export default function ChatWithPersona({
           body: formData,
         });
 
-        const json = (await response.json()) as {
+        const json = await parseApiJson<{
           success: boolean;
           data: {
             session_id: string;
@@ -330,7 +347,7 @@ export default function ChatWithPersona({
             note?: string;
           } | null;
           error: { message: string } | null;
-        };
+        }>(response, "瀵煎叆瀵硅瘽澶辫触");
 
         if (!json.success || !json.data) {
           throw new Error(json.error?.message || "导入对话失败");
@@ -354,11 +371,11 @@ export default function ChatWithPersona({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ character_id: characterId }),
         });
-        const json = (await response.json()) as {
+        const json = await parseApiJson<{
           success: boolean;
           data: SessionListItem | null;
           error: { message: string } | null;
-        };
+        }>(response, "鍒涘缓鏂颁細璇濆け璐?");
 
         if (!json.success || !json.data) {
           throw new Error(json.error?.message || "创建新会话失败");
@@ -398,10 +415,10 @@ export default function ChatWithPersona({
       const response = await fetch(`/api/sessions/${sessionId}?purge=1`, {
         method: "DELETE",
       });
-      const json = (await response.json()) as {
+      const json = await parseApiJson<{
         success: boolean;
         error: { message: string } | null;
-      };
+      }>(response, "鍒犻櫎浼氳瘽澶辫触");
 
       if (!json.success) {
         throw new Error(json.error?.message || "删除会话失败");
@@ -452,10 +469,10 @@ export default function ChatWithPersona({
       const response = await fetch(`/api/personas/${persona.id}/sessions?purge=1`, {
         method: "DELETE",
       });
-      const json = (await response.json()) as {
+      const json = await parseApiJson<{
         success: boolean;
         error: { message: string } | null;
-      };
+      }>(response, "娓呯┖鍘嗗彶浼氳瘽澶辫触");
 
       if (!json.success) {
         throw new Error(json.error?.message || "清空历史会话失败");
@@ -505,7 +522,7 @@ export default function ChatWithPersona({
         }),
       });
 
-      const json = (await response.json()) as {
+      const json = await parseApiJson<{
         success: boolean;
         data:
           | {
@@ -519,7 +536,7 @@ export default function ChatWithPersona({
             }
           | null;
         error: { message: string } | null;
-      };
+      }>(response, "鑱婂ぉ璇锋眰澶辫触");
 
       if (!json.success || !json.data) {
         throw new Error(json.error?.message || "聊天请求失败");
@@ -603,10 +620,10 @@ export default function ChatWithPersona({
           feedback_reason: "chat-memory-panel",
         }),
       });
-      const json = (await response.json()) as {
+      const json = await parseApiJson<{
         success: boolean;
         error: { message: string } | null;
-      };
+      }>(response, "鎻愪氦璁板繂鍙嶉澶辫触");
 
       if (!json.success) {
         throw new Error(json.error?.message || "提交记忆反馈失败");
@@ -673,10 +690,10 @@ export default function ChatWithPersona({
           feedback_reason: feedbackReason ?? null,
         }),
       });
-      const json = (await response.json()) as {
+      const json = await parseApiJson<{
         success: boolean;
         error: { message: string } | null;
-      };
+      }>(response, "鎻愪氦鍙嶉澶辫触");
 
       if (!json.success) {
         throw new Error(json.error?.message || "提交反馈失败");

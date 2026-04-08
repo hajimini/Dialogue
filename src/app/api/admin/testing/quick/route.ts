@@ -60,6 +60,7 @@ export async function POST(req: Request) {
       modelProviderId:
         typeof body.modelProviderId === "string" ? body.modelProviderId : undefined,
       userId: typeof body.userId === "string" ? body.userId : undefined,
+      disableDirectProviderFallback: true,
     });
 
     return NextResponse.json({
