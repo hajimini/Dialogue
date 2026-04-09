@@ -37,15 +37,15 @@ function trimToNaturalLength(text: string, maxLength = 160) {
 
 function compressAssistantTone(text: string) {
   return text
-    .replace(/^(当然|好的|首先|总之)[，。!?？\s]*/i, "")
-    .replace(/^(我理解你的感受|我理解你现在的感受)[，。!?？]*/i, "")
-    .replace(/^(根据你的描述)[，。!?？]*/i, "")
-    .replace(/^(如果你需要帮助)[，。!?？]*/i, "")
-    .replace(/^(让我们先)[，。!?？]*/i, "")
-    .replace(/^(建议你)[，。!?？]*/i, "")
-    .replace(/^(作为)[，。!?？]*/i, "")
-    .replace(/^(我是由.*开发的)[，。!?？]*/i, "")
-    .replace(/^(我不能讨论)[，。!?？]*/i, "")
+    .replace(/^(当然|好的|首先|总之)[，。！？\s]*/i, "")
+    .replace(/^(我理解你的感受|我理解你现在的感受)[，。！？\s]*/i, "")
+    .replace(/^(根据你的描述)[，。！？\s]*/i, "")
+    .replace(/^(如果你需要帮助)[，。！？\s]*/i, "")
+    .replace(/^(让我们先)[，。！？\s]*/i, "")
+    .replace(/^(建议你)[，。！？\s]*/i, "")
+    .replace(/^(作为)[，。！？\s]*/i, "")
+    .replace(/^(我是.*开发的)[，。！？\s]*/i, "")
+    .replace(/^(我不能讨论)[，。！？\s]*/i, "")
     .replace(/\s{2,}/g, " ")
     .trim();
 }
@@ -55,11 +55,25 @@ function estimateTargetSentenceCount(userMessage: string | undefined) {
   if (!text) return 2;
 
   const normalized = text.toLowerCase();
+  const compact = text.replace(/[。！？!?~～…,.，、\s]/g, "");
   const length = text.length;
   const questionMarks = (text.match(/[?？]/g) ?? []).length;
-  const clauseBreaks = (text.match(/[，,、；;。.!！?？\n]/g) ?? []).length;
+  const clauseBreaks = (text.match(/[，、；;。！？?\n]/g) ?? []).length;
 
-  const pingHints = ["在吗", "在嘛", "在不在", "嗯", "哦", "好", "哈哈", "早安", "晚安"];
+  const purePingHints = new Set([
+    "在吗",
+    "在嘛",
+    "在不在",
+    "嗯",
+    "哦",
+    "喔",
+    "好",
+    "好喔",
+    "哈哈",
+    "哈",
+    "早安",
+    "晚安",
+  ]);
   const emotionalHints = ["难受", "烦", "累", "想哭", "委屈", "崩溃", "不想", "失眠"];
   const factualHints = [
     "哪里",
@@ -79,19 +93,19 @@ function estimateTargetSentenceCount(userMessage: string | undefined) {
     "如何",
     "怎么回事",
     "要不要",
-    "告诉我一下",
-    "跟我说一下",
+    "告诉我一个",
+    "跟我说一个",
     "第一次去",
     "不太会",
     "你觉得",
   ];
 
-  if (length <= 6 || pingHints.some((hint) => text.includes(hint))) {
+  if (purePingHints.has(compact)) {
     return 1;
   }
 
   if (emotionalHints.some((hint) => text.includes(hint))) {
-    return 2;
+    return length >= 10 || questionMarks >= 1 || clauseBreaks >= 1 ? 3 : 2;
   }
 
   if (
@@ -112,7 +126,7 @@ function estimateTargetSentenceCount(userMessage: string | undefined) {
     return 2;
   }
 
-  return 1;
+  return compact.length <= 4 ? 1 : 2;
 }
 
 function splitReplyIntoBursts(text: string, maxBursts: number) {
@@ -122,7 +136,7 @@ function splitReplyIntoBursts(text: string, maxBursts: number) {
     .filter(Boolean);
 
   const sentenceSegments = lines.flatMap((line) => {
-    const matches = line.match(/[^。！？!?…\n]+[。！？!?…]?/g) ?? [];
+    const matches = line.match(/[^。！？?\n]+[。！？?]?/g) ?? [];
     const cleaned = matches.map((segment) => segment.trim()).filter(Boolean);
     return cleaned.length > 0 ? cleaned : [line];
   });
@@ -131,7 +145,7 @@ function splitReplyIntoBursts(text: string, maxBursts: number) {
     sentenceSegments.length > 0
       ? sentenceSegments
       : text
-          .split(/[，,、；;]+/)
+          .split(/[，、；;]+/)
           .map((segment) => segment.trim())
           .filter(Boolean);
 
@@ -176,7 +190,8 @@ function removeGenericFollowupTail(segments: string[], userMessage: string | und
     return cleaned;
   }
 
-  const trailingFollowup = /(?:\s+|^)(要不要我|需要我|还要我|我再跟你说|你要我)[^。！？!?]*[。！？!?]?$/i;
+  const trailingFollowup =
+    /(?:\s+|^)(要不要我|需要我|还要我|我再跟你说|你要我)[^。！？?]*[。！？?]?$/i;
   cleaned[cleaned.length - 1] = last.replace(trailingFollowup, "").trim();
   if (!cleaned[cleaned.length - 1]) {
     cleaned.pop();
@@ -193,16 +208,11 @@ export function postProcessAssistantReply(
   let text = (reply ?? "").toString().trim();
   if (!text) return "";
 
-  const prefixRe = new RegExp(`^${escapeRegExp(personaName)}[：:，,-\\s]+`, "i");
+  const prefixRe = new RegExp(`^${escapeRegExp(personaName)}[：:，,\\-\\s]+`, "i");
   text = text.replace(prefixRe, "").trim();
   text = stripMarkdown(text);
 
-  const bannedOpeners = [
-    /^作为\s*ai[\s\S]*$/i,
-    /^我是\s*ai[\s\S]*$/i,
-    /^I am an AI[\s\S]*$/i,
-    /^As an AI[\s\S]*$/i,
-  ];
+  const bannedOpeners = [/^作为\s*ai[\s\S]*$/i, /^我是\s*ai[\s\S]*$/i, /^I am an AI[\s\S]*$/i, /^As an AI[\s\S]*$/i];
 
   for (const pattern of bannedOpeners) {
     if (pattern.test(text)) {
@@ -211,16 +221,16 @@ export function postProcessAssistantReply(
   }
 
   const aiPhrases = [
-    /我理解你的感受[，。!?？]?/gi,
+    /我理解你的感受[，。！？\s]*/gi,
     /让我们一起[\s\S]{0,10}吧/gi,
-    /你可以尝试[\s\S]{0,20}[。！？!?]?/gi,
-    /建议你[\s\S]{0,20}[。！？!?]?/gi,
+    /你可以尝试[\s\S]{0,20}[。！？?]?/gi,
+    /建议你[\s\S]{0,20}[。！？?]?/gi,
     /希望能帮到你/gi,
-    /如果你需要[\s\S]{0,15}，我[\s\S]{0,15}[。！？!?]?/gi,
+    /如果你需要[\s\S]{0,15}，我[\s\S]{0,15}[。！？?]?/gi,
     /根据你的描述/gi,
     /我注意到/gi,
     /从你的话里/gi,
-    /我是由.*开发的/gi,
+    /我是.*开发的/gi,
     /我是.*AI.*助手/gi,
     /作为.*AI/gi,
   ];
