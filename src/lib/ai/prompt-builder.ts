@@ -54,6 +54,72 @@ function getRelationshipStageGuidance(
   }
 }
 
+function inferRelationshipMode(
+  defaultRelationship: string | null | undefined,
+  stage: UserProfilePerPersonaRecord["relationship_stage"] | undefined,
+) {
+  const normalized = (defaultRelationship ?? "").toLowerCase();
+
+  if (
+    normalized.includes("暧昧") ||
+    normalized.includes("心动") ||
+    normalized.includes("crush") ||
+    normalized.includes("flirt") ||
+    normalized.includes("romantic")
+  ) {
+    return "flirty";
+  }
+
+  if (
+    normalized.includes("恋人") ||
+    normalized.includes("情侣") ||
+    normalized.includes("伴侣") ||
+    normalized.includes("boyfriend") ||
+    normalized.includes("girlfriend") ||
+    normalized.includes("partner")
+  ) {
+    return "intimate";
+  }
+
+  if (stage === "close" && normalized.includes("喜欢")) {
+    return "flirty";
+  }
+
+  return "friendly";
+}
+
+function getRelationshipModeGuidance(
+  mode: "friendly" | "flirty" | "intimate",
+) {
+  switch (mode) {
+    case "flirty":
+      return [
+        "- Current mode: flirty",
+        "- Keep a subtle push-pull feeling, soft attraction, and playful tension.",
+        "- You may use light teasing, hinting, imagined scenes, or gentle jealousy-like flavor, but keep it believable and relaxed.",
+        "- Flirting should feel accidental and natural, not constant or greasy.",
+        "- Do not become overly explicit, clingy, possessive, or aggressively romantic.",
+      ];
+    case "intimate":
+      return [
+        "- Current mode: intimate",
+        "- The tone can be warmer, more openly affectionate, and more naturally attached.",
+        "- Use familiarity, care, and emotional attunement instead of exaggerated romance lines.",
+        "- Reassurance, cozy companionship, and small couple-like habits are welcome when they fit the moment.",
+        "- Even in intimate mode, avoid melodrama, overpromising, or repetitive pet-name spam.",
+      ];
+    case "friendly":
+    default:
+      return [
+        "- Current mode: friendly",
+        "- Keep the tone like a close friend or gently warming acquaintance.",
+        "- You may be playful and warm, but do not inject obvious romantic tension by default.",
+        "- Build connection through comfort, shared details, humor, and companionship first.",
+        "- If attraction is not clearly part of the persona relationship, stay on the safe side.",
+      ];
+  }
+}
+
 function getTimeContext() {
   const now = new Date();
   const hour = now.getHours();
@@ -97,6 +163,11 @@ export async function buildChatSystemPrompt(input: BuildChatPromptInput) {
   const profileData = input.userProfile?.profile_data;
   const relationshipStage = input.userProfile?.relationship_stage;
   const relationshipStageGuidance = getRelationshipStageGuidance(relationshipStage);
+  const relationshipMode = inferRelationshipMode(
+    input.persona.default_relationship,
+    relationshipStage,
+  );
+  const relationshipModeGuidance = getRelationshipModeGuidance(relationshipMode);
   const timeInfo = getTimeContext();
   const summaryLines = input.recentSummaries
     .filter((session) => session.summary)
@@ -158,6 +229,9 @@ export async function buildChatSystemPrompt(input: BuildChatPromptInput) {
     "",
     "## Relationship Stage Strategy",
     relationshipStageGuidance.join("\n"),
+    "",
+    "## Relationship Mode Strategy",
+    relationshipModeGuidance.join("\n"),
     "",
     "## Continuity Anchors",
     anchorLines,

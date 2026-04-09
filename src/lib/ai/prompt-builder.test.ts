@@ -95,4 +95,17 @@ describe("buildChatSystemPrompt", () => {
     expect(prompt).toContain("softly flirty");
     expect(prompt).toContain("push-pull");
   });
+
+  it("infers flirty mode from the persona default relationship", async () => {
+    const prompt = await buildChatSystemPrompt({
+      persona,
+      userProfile: null,
+      recentSummaries: [],
+      relevantMemories: [],
+    });
+
+    expect(prompt).toContain("## Relationship Mode Strategy");
+    expect(prompt).toContain("- Current mode: flirty");
+    expect(prompt).toContain("subtle push-pull feeling");
+  });
 });
