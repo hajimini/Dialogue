@@ -3,6 +3,10 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { buildSystemPrompt } from "@/lib/ai/prompt-templates";
+import {
+  composeRelationshipModeTaggedText,
+  type RelationshipMode,
+} from "@/lib/persona/relationship-mode";
 import type { Persona } from "@/lib/supabase/types";
 
 type PersonaFormState = {
@@ -21,6 +25,7 @@ type PersonaFormState = {
   family_info: string;
 
   default_relationship: string;
+  relationship_mode: RelationshipMode;
   forbidden_patterns: string;
   example_dialogues: string;
 
@@ -46,6 +51,7 @@ const emptyForm: PersonaFormState = {
   family_info: "",
 
   default_relationship: "",
+  relationship_mode: "friendly",
   forbidden_patterns: "",
   example_dialogues: "",
 
@@ -72,7 +78,10 @@ function toPersonaFromForm(state: PersonaFormState): Persona {
     daily_habits: state.daily_habits ? state.daily_habits : null,
     family_info: state.family_info ? state.family_info : null,
 
-    default_relationship: state.default_relationship ? state.default_relationship : null,
+    default_relationship: composeRelationshipModeTaggedText(
+      state.relationship_mode,
+      state.default_relationship,
+    ),
     forbidden_patterns: state.forbidden_patterns ? state.forbidden_patterns : null,
     example_dialogues: state.example_dialogues ? state.example_dialogues : null,
 
@@ -116,9 +125,10 @@ export default function NewPersonaPage() {
         daily_habits: form.daily_habits ? form.daily_habits.trim() : null,
         family_info: form.family_info ? form.family_info.trim() : null,
 
-        default_relationship: form.default_relationship
-          ? form.default_relationship.trim()
-          : null,
+        default_relationship: composeRelationshipModeTaggedText(
+          form.relationship_mode,
+          form.default_relationship.trim(),
+        ),
         forbidden_patterns: form.forbidden_patterns
           ? form.forbidden_patterns.trim()
           : null,
@@ -312,6 +322,24 @@ export default function NewPersonaPage() {
                 onChange={(e) => setForm((s) => ({ ...s, default_relationship: e.target.value }))}
                 className="mt-1 w-full min-h-[70px] rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 p-2 outline-none"
               />
+            </label>
+
+            <label className="text-sm">
+              关系模式标签
+              <select
+                value={form.relationship_mode}
+                onChange={(e) =>
+                  setForm((s) => ({
+                    ...s,
+                    relationship_mode: e.target.value as RelationshipMode,
+                  }))
+                }
+                className="mt-1 w-full rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 p-2 outline-none"
+              >
+                <option value="friendly">普通朋友</option>
+                <option value="flirty">暧昧模式</option>
+                <option value="intimate">亲密模式</option>
+              </select>
             </label>
 
             <label className="text-sm">

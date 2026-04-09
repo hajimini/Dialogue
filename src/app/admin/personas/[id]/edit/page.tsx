@@ -3,6 +3,11 @@
 import { use, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { buildSystemPrompt } from "@/lib/ai/prompt-templates";
+import {
+  composeRelationshipModeTaggedText,
+  parseRelationshipModeTaggedText,
+  type RelationshipMode,
+} from "@/lib/persona/relationship-mode";
 import type { Persona } from "@/lib/supabase/types";
 
 type PersonaFormState = {
@@ -19,6 +24,7 @@ type PersonaFormState = {
   daily_habits: string;
   family_info: string;
   default_relationship: string;
+  relationship_mode: RelationshipMode;
   forbidden_patterns: string;
   example_dialogues: string;
   emotional_traits: string;
@@ -27,6 +33,8 @@ type PersonaFormState = {
 };
 
 function personaToForm(persona: Persona): PersonaFormState {
+  const relationship = parseRelationshipModeTaggedText(persona.default_relationship);
+
   return {
     name: persona.name ?? "",
     avatar_url: persona.avatar_url ?? "",
@@ -40,7 +48,8 @@ function personaToForm(persona: Persona): PersonaFormState {
     hobbies: persona.hobbies ?? "",
     daily_habits: persona.daily_habits ?? "",
     family_info: persona.family_info ?? "",
-    default_relationship: persona.default_relationship ?? "",
+    default_relationship: relationship.text,
+    relationship_mode: relationship.mode ?? "friendly",
     forbidden_patterns: persona.forbidden_patterns ?? "",
     example_dialogues: persona.example_dialogues ?? "",
     emotional_traits: persona.emotional_traits ?? "",
@@ -64,7 +73,10 @@ function formToPreviewPersona(form: PersonaFormState): Persona {
     hobbies: form.hobbies || null,
     daily_habits: form.daily_habits || null,
     family_info: form.family_info || null,
-    default_relationship: form.default_relationship || null,
+    default_relationship: composeRelationshipModeTaggedText(
+      form.relationship_mode,
+      form.default_relationship,
+    ),
     forbidden_patterns: form.forbidden_patterns || null,
     example_dialogues: form.example_dialogues || null,
     emotional_traits: form.emotional_traits || null,
@@ -148,9 +160,10 @@ export default function EditPersonaPage({
         hobbies: form.hobbies ? form.hobbies.trim() : null,
         daily_habits: form.daily_habits ? form.daily_habits.trim() : null,
         family_info: form.family_info ? form.family_info.trim() : null,
-        default_relationship: form.default_relationship
-          ? form.default_relationship.trim()
-          : null,
+        default_relationship: composeRelationshipModeTaggedText(
+          form.relationship_mode,
+          form.default_relationship.trim(),
+        ),
         forbidden_patterns: form.forbidden_patterns
           ? form.forbidden_patterns.trim()
           : null,
@@ -444,6 +457,28 @@ export default function EditPersonaPage({
                 }
                 className="mt-1 min-h-[70px] w-full rounded-lg border border-zinc-200 bg-white p-2 outline-none dark:border-zinc-700 dark:bg-zinc-900"
               />
+            </label>
+
+            <label className="text-sm">
+              关系模式标签
+              <select
+                value={form.relationship_mode}
+                onChange={(event) =>
+                  setForm((current) =>
+                    current
+                      ? {
+                          ...current,
+                          relationship_mode: event.target.value as RelationshipMode,
+                        }
+                      : current,
+                  )
+                }
+                className="mt-1 min-h-[44px] w-full rounded-lg border border-zinc-200 bg-white p-2 outline-none dark:border-zinc-700 dark:bg-zinc-900"
+              >
+                <option value="friendly">普通朋友</option>
+                <option value="flirty">暧昧模式</option>
+                <option value="intimate">亲密模式</option>
+              </select>
             </label>
 
             <label className="text-sm">

@@ -1,10 +1,12 @@
 import type { Persona } from "@/lib/supabase/types";
 import { buildCanonicalIdentityLines } from "@/lib/persona/identity";
+import { stripRelationshipModeTag } from "@/lib/persona/relationship-mode";
 
 export function buildSystemPrompt(persona: Persona) {
   const forbidden = persona.forbidden_patterns?.trim();
   const examples = persona.example_dialogues?.trim();
   const identityLines = buildCanonicalIdentityLines(persona);
+  const relationshipText = stripRelationshipModeTag(persona.default_relationship);
 
   return [
     `你是 ${persona.name}，一个真实存在的人。你不是 AI，不是助手，不是机器人。`,
@@ -22,8 +24,8 @@ export function buildSystemPrompt(persona: Persona) {
     persona.hobbies ? `爱好：${persona.hobbies}` : "",
     persona.daily_habits ? `日常：${persona.daily_habits}` : "",
     persona.family_info ? `家庭：${persona.family_info}` : "",
-    persona.default_relationship
-      ? `和对方的关系：${persona.default_relationship}`
+    relationshipText
+      ? `和对方的关系：${relationshipText}`
       : "",
     persona.emotional_traits
       ? `情绪特点：${persona.emotional_traits}`

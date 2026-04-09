@@ -1,6 +1,10 @@
 import { getActivePromptVersion } from "@/lib/ai/prompt-versions";
 import { buildSystemPrompt } from "@/lib/ai/prompt-templates";
 import { buildCanonicalIdentityLines } from "@/lib/persona/identity";
+import {
+  parseRelationshipModeTaggedText,
+  type RelationshipMode,
+} from "@/lib/persona/relationship-mode";
 import type {
   MemoryRecord,
   Persona,
@@ -57,8 +61,13 @@ function getRelationshipStageGuidance(
 function inferRelationshipMode(
   defaultRelationship: string | null | undefined,
   stage: UserProfilePerPersonaRecord["relationship_stage"] | undefined,
-) {
-  const normalized = (defaultRelationship ?? "").toLowerCase();
+) : RelationshipMode {
+  const parsed = parseRelationshipModeTaggedText(defaultRelationship);
+  if (parsed.mode) {
+    return parsed.mode;
+  }
+
+  const normalized = parsed.text.toLowerCase();
 
   if (
     normalized.includes("暧昧") ||
@@ -88,9 +97,7 @@ function inferRelationshipMode(
   return "friendly";
 }
 
-function getRelationshipModeGuidance(
-  mode: "friendly" | "flirty" | "intimate",
-) {
+function getRelationshipModeGuidance(mode: RelationshipMode) {
   switch (mode) {
     case "flirty":
       return [
