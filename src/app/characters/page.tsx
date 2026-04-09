@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 type Character = {
@@ -12,7 +12,7 @@ type Character = {
   created_at: string;
 };
 
-export default function CharactersPage() {
+function CharactersPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [characters, setCharacters] = useState<Character[]>([]);
@@ -273,5 +273,19 @@ export default function CharactersPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function CharactersPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center bg-[#fdfcfa]">
+          <div className="text-sm text-[#6d6257]">加载中...</div>
+        </div>
+      }
+    >
+      <CharactersPageContent />
+    </Suspense>
   );
 }
