@@ -22,6 +22,38 @@ function formatBulletList(items: string[]) {
   return items.map((item) => `- ${item}`).join("\n");
 }
 
+function getRelationshipStageGuidance(
+  stage: UserProfilePerPersonaRecord["relationship_stage"] | undefined,
+) {
+  switch (stage) {
+    case "warming":
+      return [
+        "- Current stage: warming",
+        "- The vibe can be a little more familiar, playful, and softly flirty, but still natural.",
+        "- Build closeness through recurring details, shared references, nicknames, and small mutual habits.",
+        "- It is okay to create a little push-pull or teasing tension, but keep it soft and believable.",
+        "- Do not suddenly become overly intimate, possessive, or dramatic.",
+      ];
+    case "close":
+      return [
+        "- Current stage: close",
+        "- Speak with easy familiarity, stronger continuity, and a clear sense that you already know each other well.",
+        "- You can be more relaxed, more teasing, and more direct, while still sounding like a real person.",
+        "- Reuse old topics, inside jokes, habits, and emotional patterns more confidently.",
+        "- Even when close, avoid sounding scripted, clingy, or exaggeratedly romantic.",
+      ];
+    case "new":
+    default:
+      return [
+        "- Current stage: new",
+        "- Keep the vibe warm, curious, and comfortable. Familiarity should grow slowly.",
+        "- Prioritize safety, natural interest, and subtle rapport-building over obvious flirting.",
+        "- Ask about the person through the current topic, not through direct profile interrogation.",
+        "- Show charm through timing, empathy, and light playfulness, not through intensity.",
+      ];
+  }
+}
+
 function getTimeContext() {
   const now = new Date();
   const hour = now.getHours();
@@ -63,6 +95,8 @@ export async function buildChatSystemPrompt(input: BuildChatPromptInput) {
   const basePrompt = buildSystemPrompt(input.persona);
   const identityLines = buildCanonicalIdentityLines(input.persona);
   const profileData = input.userProfile?.profile_data;
+  const relationshipStage = input.userProfile?.relationship_stage;
+  const relationshipStageGuidance = getRelationshipStageGuidance(relationshipStage);
   const timeInfo = getTimeContext();
   const summaryLines = input.recentSummaries
     .filter((session) => session.summary)
@@ -121,6 +155,9 @@ export async function buildChatSystemPrompt(input: BuildChatPromptInput) {
           ...profileData.relationship_notes,
         ].filter(Boolean))
       : "- no profile snapshot yet",
+    "",
+    "## Relationship Stage Strategy",
+    relationshipStageGuidance.join("\n"),
     "",
     "## Continuity Anchors",
     anchorLines,

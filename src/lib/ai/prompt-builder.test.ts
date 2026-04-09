@@ -65,4 +65,34 @@ describe("buildChatSystemPrompt", () => {
     expect(prompt).toContain("After 23:00, start winding the conversation down in character.");
     expect(prompt).toContain("Do not repeatedly ask biography-style questions in consecutive turns.");
   });
+
+  it("changes strategy text based on relationship stage", async () => {
+    const prompt = await buildChatSystemPrompt({
+      persona,
+      userProfile: {
+        id: "profile-1",
+        user_id: "user-1",
+        persona_id: persona.id,
+        character_id: null,
+        relationship_stage: "warming",
+        total_messages: 28,
+        updated_at: null,
+        profile_data: {
+          summary: "He is a night owl who likes casual chatting.",
+          facts: ["Works in design."],
+          preferences: ["Likes coffee."],
+          relationship_notes: ["They already have a few recurring topics."],
+          recent_topics: ["late-night snacks"],
+          anchors: ["He often chats after 10pm."],
+        },
+      },
+      recentSummaries: [],
+      relevantMemories: [],
+    });
+
+    expect(prompt).toContain("## Relationship Stage Strategy");
+    expect(prompt).toContain("- Current stage: warming");
+    expect(prompt).toContain("softly flirty");
+    expect(prompt).toContain("push-pull");
+  });
 });
