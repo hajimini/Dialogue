@@ -12,6 +12,22 @@ import type {
 
 type PersonaOption = Pick<Persona, "id" | "name" | "occupation" | "city">;
 type CharacterOption = Pick<UserCharacterRecord, "id" | "name">;
+type MemoryScopeOption = {
+  userId: string;
+  userNickname: string | null;
+  userEmail: string | null;
+  personaId: string;
+  personaName: string;
+  personaOccupation: string | null;
+  personaCity: string | null;
+  personaIsActive: boolean;
+  characterId: string;
+  characterName: string;
+  characterIsActive: boolean;
+  memoryCount: number;
+  sessionCount: number;
+  lastActivityAt: string | null;
+};
 
 type EnhancedMemoryRecord = MemoryRecord & {
   embedding_provider?: string | null;
@@ -111,37 +127,52 @@ function formatRangeStart(page: number) {
   return page * PAGE_SIZE + 1;
 }
 
+function uniqueById<T extends { id: string }>(items: T[]) {
+  const seen = new Set<string>();
+  const result: T[] = [];
+
+  for (const item of items) {
+    if (seen.has(item.id)) continue;
+    seen.add(item.id);
+    result.push(item);
+  }
+
+  return result;
+}
+
 export default function MemoriesClient({
   users,
   personas,
   characters,
+  scopes,
 }: {
   users: AppUserRecord[];
   personas: PersonaOption[];
   characters: CharacterOption[];
+  scopes: MemoryScopeOption[];
 }) {
   // 初始值不读 localStorage，避免 hydration mismatch
-  const [selectedUserId, setSelectedUserId] = useState(users[0]?.id ?? "");
-  const [selectedPersonaId, setSelectedPersonaId] = useState(personas[0]?.id ?? "");
-  const [selectedCharacterId, setSelectedCharacterId] = useState(characters[0]?.id ?? "");
+  const [selectedUserId, setSelectedUserId] = useState("");
+  const [selectedPersonaId, setSelectedPersonaId] = useState("");
+  const [selectedCharacterId, setSelectedCharacterId] = useState("");
 
   // 挂载后从 localStorage 恢复上次选择
   useEffect(() => {
     const savedUserId = localStorage.getItem("admin_memories_selected_user_id");
-    if (savedUserId && users.find(u => u.id === savedUserId)) {
+    if (savedUserId) {
       setSelectedUserId(savedUserId);
     }
 
     const savedPersonaId = localStorage.getItem("admin_memories_selected_persona_id");
-    if (savedPersonaId && personas.find(p => p.id === savedPersonaId)) {
+    if (savedPersonaId) {
       setSelectedPersonaId(savedPersonaId);
     }
 
     const savedCharacterId = localStorage.getItem("admin_memories_selected_character_id");
-    if (savedCharacterId && characters.find(c => c.id === savedCharacterId)) {
+    if (savedCharacterId) {
       setSelectedCharacterId(savedCharacterId);
     }
-  }, [users, personas, characters]);
+  }, []);
 
   // 保存选择到 localStorage
   useEffect(() => {
@@ -206,13 +237,131 @@ export default function MemoriesClient({
   const [isDetectingDuplicates, setIsDetectingDuplicates] = useState(false);
   const [duplicateThreshold, setDuplicateThreshold] = useState("0.95");
 
+  const scopedUsers = useMemo(() => {
+    if (scopes.length === 0) {
+      return users;
+    }
+
+    const items = scopes.map((scope) => {
+      const existing = users.find((user) => user.id === scope.userId);
+      if (existing) return existing;
+
+      return {
+        id: scope.userId,
+        email: scope.userEmail ?? "",
+        nickname: scope.userNickname ?? scope.userEmail ?? scope.userId,
+        role: "user" as const,
+        created_at: null,
+        last_login_at: null,
+      };
+    });
+
+    return uniqueById(items);
+  }, [scopes, users]);
+
+  const scopedPersonas = useMemo(() => {
+    const source =
+      scopes.length > 0
+        ? scopes.filter((scope) => scope.userId === selectedUserId)
+        : [];
+
+    if (source.length === 0) {
+      return personas;
+    }
+
+    const items = source.map((scope) => {
+      const existing = personas.find((persona) => persona.id === scope.personaId);
+      if (existing) return existing;
+
+      return {
+        id: scope.personaId,
+        name: scope.personaName,
+        occupation: scope.personaOccupation,
+        city: scope.personaCity,
+      };
+    });
+
+    return uniqueById(items);
+  }, [personas, scopes, selectedUserId]);
+
+  const scopedCharacters = useMemo(() => {
+    const source =
+      scopes.length > 0
+        ? scopes.filter(
+            (scope) =>
+              scope.userId === selectedUserId &&
+              scope.personaId === selectedPersonaId,
+          )
+        : [];
+
+    if (source.length === 0) {
+      return characters;
+    }
+
+    const items = source.map((scope) => {
+      const existing = characters.find((character) => character.id === scope.characterId);
+      if (existing) return existing;
+
+      return {
+        id: scope.characterId,
+        name: scope.characterName,
+      };
+    });
+
+    return uniqueById(items);
+  }, [characters, scopes, selectedPersonaId, selectedUserId]);
+
+  useEffect(() => {
+    const nextUserId =
+      scopedUsers.find((user) => user.id === selectedUserId)?.id ??
+      scopedUsers[0]?.id ??
+      "";
+    const nextPersonaId =
+      scopedPersonas.find((persona) => persona.id === selectedPersonaId)?.id ??
+      scopedPersonas[0]?.id ??
+      "";
+    const nextCharacterId =
+      scopedCharacters.find((character) => character.id === selectedCharacterId)?.id ??
+      scopedCharacters[0]?.id ??
+      "";
+
+    if (
+      nextUserId === selectedUserId &&
+      nextPersonaId === selectedPersonaId &&
+      nextCharacterId === selectedCharacterId
+    ) {
+      return;
+    }
+
+    if (page !== 0) {
+      setPage(0);
+    }
+    if (nextUserId !== selectedUserId) {
+      setSelectedUserId(nextUserId);
+    }
+    if (nextPersonaId !== selectedPersonaId) {
+      setSelectedPersonaId(nextPersonaId);
+    }
+    if (nextCharacterId !== selectedCharacterId) {
+      setSelectedCharacterId(nextCharacterId);
+    }
+  }, [
+    page,
+    scopedCharacters,
+    scopedPersonas,
+    scopedUsers,
+    selectedCharacterId,
+    selectedPersonaId,
+    selectedUserId,
+  ]);
+
   const selectedUser = useMemo(
-    () => users.find((item) => item.id === selectedUserId) ?? null,
-    [selectedUserId, users],
+    () => scopedUsers.find((item) => item.id === selectedUserId) ?? null,
+    [scopedUsers, selectedUserId],
   );
   const selectedPersona = useMemo(
-    () => personas.find((item) => item.id === selectedPersonaId) ?? null,
-    [personas, selectedPersonaId],
+    () => scopedPersonas.find((item) => item.id === selectedPersonaId) ?? null,
+    [scopedPersonas, selectedPersonaId],
   );
 
   const totalCount = snapshot?.total_count ?? 0;
@@ -306,6 +455,7 @@ export default function MemoriesClient({
     setSearchMetrics(null);
     setSearchQuery("");
     setEditingId(null);
+    setSelectedMemoryIds(new Set());
   }, [selectedPersonaId, selectedUserId, selectedCharacterId]);
 
   async function handleCreateMemory() {
@@ -614,6 +764,11 @@ export default function MemoriesClient({
                   人设：{selectedPersona.name}
                 </div>
               ) : null}
+              {scopes.length > 0 ? (
+                <div className="rounded-full border border-[#d5e4dc] bg-white/82 px-4 py-2">
+                  已自动对齐真实对话链路
+                </div>
+              ) : null}
               {snapshot?.config ? (
                 <div className="rounded-full border border-[#d5e4dc] bg-white/82 px-4 py-2">
                   {snapshot.config.EMBEDDING_PROVIDER} / {snapshot.config.EMBEDDING_MODEL}
@@ -635,7 +790,7 @@ export default function MemoriesClient({
                 }}
                 className="mt-3 w-full rounded-2xl border border-[#d7e6df] bg-white px-4 py-3 outline-none"
               >
-                {users.map((user) => (
+                {scopedUsers.map((user) => (
                   <option key={user.id} value={user.id}>
                     {user.nickname} / {user.email}
                   </option>
@@ -655,7 +810,7 @@ export default function MemoriesClient({
                 }}
                 className="mt-3 w-full rounded-2xl border border-[#d7e6df] bg-white px-4 py-3 outline-none"
               >
-                {personas.map((persona) => (
+                {scopedPersonas.map((persona) => (
                   <option key={persona.id} value={persona.id}>
                     {persona.name}
                     {persona.occupation ? ` / ${persona.occupation}` : ""}
@@ -676,7 +831,7 @@ export default function MemoriesClient({
                 }}
                 className="mt-3 w-full rounded-2xl border border-[#d7e6df] bg-white px-4 py-3 outline-none"
               >
-                {characters.map((character) => (
+                {scopedCharacters.map((character) => (
                   <option key={character.id} value={character.id}>
                     {character.name}
                   </option>
